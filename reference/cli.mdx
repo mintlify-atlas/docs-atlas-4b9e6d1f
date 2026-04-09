@@ -1,0 +1,482 @@
+---
+title: "DevPod CLI reference: all commands, flags, and global options"
+description: Complete reference for all DevPod CLI commands, flags, and global options. Covers workspace management, providers, machines, IDEs, and contexts.
+---
+
+The DevPod CLI is the primary interface for creating, managing, and connecting to developer workspaces. All commands accept global flags that control logging and context. Run `devpod --help` or append `--help` to any subcommand for inline documentation.
+
+## Global flags
+
+These flags are available on every command.
+
+| Flag | Default | Description |
+|---|---|---|
+| `--context` | | The context to use |
+| `--provider` | | The provider to use, must be configured for the selected context |
+| `--devpod-home` | | Override the default DevPod home directory (also: `DEVPOD_HOME` env var) |
+| `--log-output` | `plain` | Log format: `plain`, `raw`, or `json` |
+| `--debug` | `false` | Print stack traces on error |
+| `--silent` | `false` | Suppress all output except panics and fatals |
+
+## Commands
+
+<AccordionGroup>
+
+<Accordion title="devpod up">
+
+Start or create a workspace. If the workspace does not yet exist it is created; if it already exists it is started and opened. The argument can be a local path, a Git repository URL, or an existing workspace name.
+
+```bash
+devpod up [flags] [workspace-path|workspace-name]
+```
+
+**Examples**
+
+```bash
+# Open a Git repository as a workspace
+devpod up https://github.com/my-org/my-repo
+
+# Open with a specific IDE
+devpod up https://github.com/my-org/my-repo --ide vscode
+
+# Recreate a workspace from scratch, keeping source
+devpod up my-workspace --recreate
+
+# Full reset including sources
+devpod up my-workspace --reset
+
+# Use dotfiles from a Git repository
+devpod up my-workspace --dotfiles https://github.com/me/dotfiles
+
+# Pass extra environment variables into the workspace
+devpod up my-workspace --workspace-env MY_VAR=value
+```
+
+**Flags**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--ide` | | The IDE to open the workspace in. If empty, uses VS Code locally or in browser |
+| `--ide-option` | | IDE option in the form `KEY=VALUE` |
+| `--id` | | The ID to use for the workspace |
+| `--machine` | | The machine to use for this workspace. Must exist beforehand |
+| `--provider-option` | | Provider option in the form `KEY=VALUE` |
+| `--devcontainer-image` | | Container image to use, overrides the value in `devcontainer.json` |
+| `--devcontainer-path` | | Path to `devcontainer.json` relative to the project |
+| `--recreate` | `false` | Remove existing containers and recreate them |
+| `--reset` | `false` | Remove existing containers including sources, then recreate |
+| `--prebuild-repository` | | Docker repository hosting DevPod prebuilds for this workspace |
+| `--workspace-env` | | Extra env variables for the workspace, e.g. `MY_VAR=value` |
+| `--workspace-env-file` | | Path to a file containing `KEY=VALUE` env variable pairs |
+| `--init-env` | | Extra env variables injected during workspace initialization |
+| `--dotfiles` | | Path or URL of dotfiles to clone into the container |
+| `--dotfiles-script` | | Path within the dotfiles directory to the install script |
+| `--dotfiles-script-env` | | Extra env variables passed to the dotfiles install script |
+| `--dotfiles-script-env-file` | | Path to files containing env variables for the dotfiles install script |
+| `--configure-ssh` | `true` | Write the workspace SSH config to `~/.ssh/config` |
+| `--ssh-config` | | Path to the SSH config to modify. Defaults to `~/.ssh/config` |
+| `--gpg-agent-forwarding` | `false` | Forward the local gpg-agent into the workspace |
+| `--open-ide` | `true` | If `false`, install the IDE server backend but do not open it |
+| `--git-clone-strategy` | `full` | Git clone strategy: `full`, `blobless`, `treeless`, or `shallow` |
+| `--git-clone-recursive-submodules` | `false` | Clone git submodule repositories recursively |
+| `--git-ssh-signing-key` | | SSH key for signing git commits. Must match `git config user.signingkey` format |
+| `--fallback-image` | | Fallback image when no devcontainer configuration is detected |
+| `--disable-daemon` | `false` | Do not install an inactivity-tracking daemon into the target machine |
+| `--source` | | Explicit workspace source, e.g. `git:https://github.com/my-org/my-repo` |
+| `--reconfigure` | `false` | Reconfigure options for this workspace (DevPod Pro only) |
+
+</Accordion>
+
+<Accordion title="devpod ssh">
+
+Open an SSH session to a running workspace. By default this starts an interactive shell. Use `--command` to run a single command and exit.
+
+```bash
+devpod ssh [flags] [workspace-folder|workspace-name]
+```
+
+**Examples**
+
+```bash
+# Interactive SSH session
+devpod ssh my-workspace
+
+# Run a single command
+devpod ssh my-workspace --command "echo hello"
+
+# SSH as a specific user
+devpod ssh my-workspace --user vscode
+
+# Forward local port 8080 to remote port 8080
+devpod ssh my-workspace -L 8080:localhost:8080
+
+# Forward GPG agent
+devpod ssh my-workspace --gpg-agent-forwarding
+```
+
+**Flags**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--command` | | Command to execute inside the workspace |
+| `--user` | | User to connect as |
+| `--workdir` | | Working directory inside the container |
+| `--agent-forwarding` | `true` | Forward local SSH keys to the remote machine |
+| `--gpg-agent-forwarding` | `false` | Forward the local gpg-agent to the remote machine |
+| `--start-services` | `true` | Start port-forwarding and credentials helpers |
+| `--forward-ports` / `-L` | | Forward a local TCP port or socket to the remote side |
+| `--reverse-forward-ports` / `-R` | | Reverse-forward a remote TCP port or socket to the local side |
+| `--send-env` | | Local environment variables to send into the container |
+| `--set-env` | | Environment variables to set in the container |
+| `--forward-ports-timeout` | | Terminate when forwarded ports are unused for this duration |
+| `--ssh-keepalive-interval` | `55s` | Interval between SSH keepalive requests |
+| `--stdio` | `false` | Tunnel the connection through stdout and stdin |
+
+</Accordion>
+
+<Accordion title="devpod stop">
+
+Stop a running workspace. The workspace can be restarted with `devpod up`.
+
+```bash
+devpod stop [flags] [workspace-path|workspace-name]
+```
+
+**Examples**
+
+```bash
+devpod stop my-workspace
+```
+
+This command has no additional flags beyond the global flags.
+
+</Accordion>
+
+<Accordion title="devpod delete">
+
+Delete a workspace and remove its resources. Pass multiple workspace names to delete several at once.
+
+```bash
+devpod delete [flags] [workspace-path|workspace-name]
+```
+
+**Examples**
+
+```bash
+devpod delete my-workspace
+
+# Force-delete even if the workspace is not found remotely
+devpod delete my-workspace --force
+
+# Ignore missing workspaces (useful in scripts)
+devpod delete my-workspace --ignore-not-found
+```
+
+**Flags**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--force` | `false` | Delete the workspace even if it is not found remotely |
+| `--grace-period` | | Time to wait for the workspace to be deleted |
+| `--ignore-not-found` | `false` | Treat "workspace not found" as a successful delete |
+
+</Accordion>
+
+<Accordion title="devpod list">
+
+List all workspaces in the current context. Alias: `ls`.
+
+```bash
+devpod list [flags]
+```
+
+**Examples**
+
+```bash
+devpod list
+
+# JSON output for scripting
+devpod list --output json
+```
+
+**Flags**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--output` | `plain` | Output format: `plain` or `json` |
+| `--skip-pro` | `false` | Do not list Pro workspaces |
+
+The plain table includes: Name, Source, Machine, Provider, IDE, Last Used, Age, and whether it is a Pro workspace.
+
+</Accordion>
+
+<Accordion title="devpod status">
+
+Show the current status of a workspace. Possible states are `Running`, `Stopped`, `Busy`, and `NotFound`.
+
+```bash
+devpod status [flags] [workspace-path|workspace-name]
+```
+
+**Examples**
+
+```bash
+devpod status my-workspace
+
+# Machine-readable output
+devpod status my-workspace --output json
+```
+
+**Flags**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--output` | `plain` | Output format: `plain` or `json` |
+| `--container-status` | `true` | Include the container status in the output |
+| `--timeout` | `30s` | Timeout waiting for the status to be retrieved |
+
+</Accordion>
+
+<Accordion title="devpod build">
+
+Prebuild the devcontainer image for a workspace and optionally push it to a registry. Use `--repository` to set a pull-through cache that later `devpod up` calls can consume via `--prebuild-repository`.
+
+```bash
+devpod build [flags] [workspace-path|workspace-name]
+```
+
+**Examples**
+
+```bash
+# Build and push to a registry
+devpod build https://github.com/my-org/my-repo --repository ghcr.io/my-org/my-repo
+
+# Build without pushing (e.g. for local testing)
+devpod build . --skip-push
+
+# Multi-platform build
+devpod build . --repository ghcr.io/my-org/my-repo --platform linux/amd64,linux/arm64
+```
+
+**Flags**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--repository` | | Registry repository to push the built image to |
+| `--tag` | | Image tag(s), comma-separated or repeated flag. E.g. `--tag latest` |
+| `--platform` | | Target platform(s) for the build, e.g. `linux/amd64` |
+| `--skip-push` | `false` | Build the image but do not push it |
+| `--skip-delete` | `false` | Keep the temporary workspace after building |
+| `--devcontainer-image` | | Container image to use, overrides `devcontainer.json` |
+| `--devcontainer-path` | | Path to `devcontainer.json` relative to the project |
+| `--machine` | | Machine to build on. Must exist beforehand |
+| `--provider-option` | | Provider option in the form `KEY=VALUE` |
+| `--git-clone-strategy` | `full` | Git clone strategy: `full`, `blobless`, `treeless`, or `shallow` |
+| `--git-clone-recursive-submodules` | `false` | Clone submodules recursively |
+
+</Accordion>
+
+<Accordion title="devpod logs">
+
+Stream the logs from a workspace's devcontainer creation process.
+
+```bash
+devpod logs [workspace-path|workspace-name]
+```
+
+</Accordion>
+
+<Accordion title="devpod export / devpod import">
+
+Export a workspace to a portable archive, or import a previously exported archive.
+
+```bash
+devpod export [workspace-path|workspace-name]
+devpod import
+```
+
+</Accordion>
+
+<Accordion title="devpod troubleshoot">
+
+Print a JSON blob with workspace, provider, config, and daemon information useful for diagnosing issues. When reporting a bug, include this output.
+
+```bash
+devpod troubleshoot [workspace-path|workspace-name]
+```
+
+The output includes: CLI version, full config, all configured providers, DevPod Pro instance details, workspace config and status, and daemon status (where applicable).
+
+</Accordion>
+
+<Accordion title="devpod upgrade">
+
+Upgrade the DevPod CLI binary to the latest version.
+
+```bash
+devpod upgrade
+```
+
+</Accordion>
+
+<Accordion title="devpod version">
+
+Print the current DevPod CLI version.
+
+```bash
+devpod version
+```
+
+</Accordion>
+
+<Accordion title="devpod provider">
+
+Manage DevPod providers. Providers define where workspaces are created (e.g. Docker, Kubernetes, AWS, GCP).
+
+```bash
+devpod provider <subcommand>
+```
+
+| Subcommand | Description |
+|---|---|
+| `add [URL or path]` | Install a new provider from a URL, local path, or Git repository |
+| `list` | List all installed providers |
+| `use <name>` | Set a provider as the default for the current context |
+| `options <name>` | Show all configurable options for a provider |
+| `set-options <name>` | Set provider options with `-o KEY=VALUE` |
+| `update <name>` | Update a provider to a newer version |
+| `delete <name>` | Remove a provider |
+
+**`provider add` flags**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--name` | | Override the provider name |
+| `--option` / `-o` | | Provider option in the form `KEY=VALUE` |
+| `--use` | `true` | Activate the provider immediately after adding |
+| `--single-machine` | `false` | Use a single shared machine for all workspaces |
+| `--from-existing` | | Clone an existing provider as a template (requires `--name`) |
+
+**Examples**
+
+```bash
+# Add a provider from a URL
+devpod provider add https://github.com/loft-sh/devpod-provider-aws
+
+# Add a provider and set an option
+devpod provider add https://github.com/loft-sh/devpod-provider-kubernetes -o KUBERNETES_NAMESPACE=devpod
+
+# List installed providers
+devpod provider list
+
+# Show options for an installed provider
+devpod provider options aws
+```
+
+</Accordion>
+
+<Accordion title="devpod machine">
+
+Manage machines that host workspaces. Machines are persistent VMs or nodes that multiple workspaces can share.
+
+```bash
+devpod machine <subcommand>
+```
+
+| Subcommand | Description |
+|---|---|
+| `create` | Create a new machine |
+| `list` | List all machines |
+| `start <name>` | Start a stopped machine |
+| `stop <name>` | Stop a running machine |
+| `status <name>` | Show the status of a machine |
+| `delete <name>` | Delete a machine |
+| `ssh <name>` | Open an SSH session to a machine |
+
+</Accordion>
+
+<Accordion title="devpod ide">
+
+Manage IDE configuration.
+
+```bash
+devpod ide <subcommand>
+```
+
+| Subcommand | Description |
+|---|---|
+| `list` | List all supported IDEs |
+| `use <name>` | Set the default IDE for new workspaces |
+| `options <name>` | Show configurable options for an IDE |
+| `set-options <name>` | Set IDE options with `-o KEY=VALUE` |
+
+**Example**
+
+```bash
+# Set VS Code as the default IDE
+devpod ide use vscode
+
+# Set the default IDE to open VS Code in the browser
+devpod ide use openvscode
+```
+
+See the [IDE Support reference](/reference/ide-support) for the full list of supported IDE names.
+
+</Accordion>
+
+<Accordion title="devpod context">
+
+Manage DevPod contexts. A context groups a set of providers, defaults, and options. Contexts let you switch between different environments (e.g. local Docker vs. a cloud provider).
+
+```bash
+devpod context <subcommand>
+```
+
+| Subcommand | Description |
+|---|---|
+| `create <name>` | Create a new context |
+| `list` | List all contexts |
+| `use <name>` | Switch to a different context |
+| `options` | Show options for the current context |
+| `set-options` | Set context-level options with `-o KEY=VALUE` |
+| `delete <name>` | Delete a context |
+
+**Examples**
+
+```bash
+# Disable telemetry for the current context
+devpod context set-options -o TELEMETRY=false
+
+# Disable SSH strict host key checking
+devpod context set-options -o SSH_STRICT_HOST_KEY_CHECKING=false
+```
+
+</Accordion>
+
+<Accordion title="devpod completion">
+
+Generate shell completion scripts.
+
+```bash
+devpod completion [bash|zsh|fish|powershell]
+```
+
+**Examples**
+
+```bash
+# Bash
+devpod completion bash > /etc/bash_completion.d/devpod
+
+# Zsh
+devpod completion zsh > "${fpath[1]}/_devpod"
+
+# Fish
+devpod completion fish | source
+
+# PowerShell
+devpod completion powershell | Out-String | Invoke-Expression
+```
+
+</Accordion>
+
+</AccordionGroup>

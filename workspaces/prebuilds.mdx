@@ -1,0 +1,79 @@
+---
+title: "Prebuild DevPod workspace images for faster startup times"
+description: "Prebuilds let you pre-build workspace container images and push them to a registry. DevPod reuses the cached image to skip the build step on every devpod up."
+---
+
+A prebuild is a pre-built Docker image derived from your `devcontainer.json`, its referenced features, and any linked Dockerfile. When you create a workspace without prebuilds, DevPod builds the container image from scratch on every `devpod up`. With prebuilds, DevPod pulls the cached image instead — skipping the build step entirely and reducing startup time significantly for complex environments.
+
+## How prebuilds work
+
+When you run `devpod build`, DevPod computes a hash of your `devcontainer.json` configuration and tags the resulting image `devpod-<HASH>`. It then pushes that image to a Docker registry you specify. When a workspace is created with a prebuild repository configured, DevPod searches the registry for an image with a matching hash. If found, it uses that image directly. If not found, DevPod falls back to building the image locally.
+
+<Info>
+  DevPod skips building if a prebuild with the same configuration hash already exists in the specified registry.
+</Info>
+
+## Building a prebuild
+
+Use `devpod build` to build and push a prebuild image:
+
+```bash
+devpod build github.com/my-org/my-repo --repository ghcr.io/my-org/my-repo
+```
+
+DevPod uses the currently configured provider to perform the build, so you can use any provider — including remote providers — for prebuild generation. You can even maintain a dedicated provider just for building prebuild images.
+
+### Automate prebuilds with CI/CD
+
+Run `devpod build` in your CI pipeline whenever `devcontainer.json` or the Dockerfile changes. This keeps the prebuild image up to date so every developer gets fast workspace creation.
+
+## Using a prebuild
+
+You can reference a prebuild repository in two ways: as a flag at workspace creation time, or directly inside `devcontainer.json`.
+
+### As a flag
+
+Pass `--prebuild-repository` when creating a workspace:
+
+```bash
+devpod up github.com/my-org/my-repo --prebuild-repository ghcr.io/my-org/my-repo
+```
+
+DevPod searches the registry for a matching prebuild hash and uses it if found.
+
+### In devcontainer.json
+
+Embed the prebuild repository in `devcontainer.json` so all users of the repository automatically benefit:
+
+```json
+{
+  "name": "my-project",
+  "customizations": {
+    "devpod": {
+      "prebuildRepository": "ghcr.io/my-org/my-repo"
+    }
+  }
+}
+```
+
+<Info>
+  If a prebuild cannot be found in the configured repository — either because it does not exist or because credentials are missing — DevPod silently falls back to building the image itself.
+</Info>
+
+## Benefits
+
+- **Faster workspace creation** — skip the image build step on every `devpod up`
+- **Consistent environments** — all team members start from the same image
+- **CI-driven updates** — rebuild prebuilds automatically when the configuration changes
+- **Provider flexibility** — use any provider, including remote ones, to build images
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Create a workspace" icon="plus" href="/workspaces/create-workspace">
+    Use the `--prebuild-repository` flag when creating a workspace.
+  </Card>
+  <Card title="devcontainer.json" icon="file-code" href="/workspaces/devcontainer-json">
+    Embed the prebuild repository directly in your configuration file.
+  </Card>
+</CardGroup>

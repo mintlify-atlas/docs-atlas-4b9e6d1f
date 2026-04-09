@@ -1,0 +1,112 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "DevPod",
+  "projectDescription": "An open-source, client-only tool for creating reproducible developer environments based on devcontainer.json, supporting any IDE and any backend including Docker, Kubernetes, or cloud VMs.",
+  "theme": "aspen",
+  "primaryColor": "#a544fc",
+  "lightColor": "#c684fc",
+  "darkColor": "#040c24",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "getting-started/install",
+              "getting-started/quickstart"
+            ]
+          },
+          {
+            "group": "Workspaces",
+            "pages": [
+              "workspaces/what-are-workspaces",
+              "workspaces/create-workspace",
+              "workspaces/connect-to-workspace",
+              "workspaces/stop-delete-workspace",
+              "workspaces/devcontainer-json",
+              "workspaces/prebuilds",
+              "workspaces/dotfiles",
+              "workspaces/credentials"
+            ]
+          },
+          {
+            "group": "Providers",
+            "pages": [
+              "providers/what-are-providers",
+              "providers/add-provider",
+              "providers/manage-providers"
+            ]
+          },
+          {
+            "group": "Building Providers",
+            "pages": [
+              "building-providers/quickstart",
+              "building-providers/provider-yaml",
+              "building-providers/options",
+              "building-providers/agent",
+              "building-providers/binaries"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/cli",
+              "reference/how-it-works",
+              "reference/ide-support",
+              "reference/troubleshooting"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Client-only architecture — no server backend required",
+    "devcontainer.json standard compatibility (same as GitHub Codespaces)",
+    "Multi-backend support: Docker, Kubernetes, cloud VMs, remote SSH machines",
+    "Full IDE support: VS Code, JetBrains suite, Zed, Cursor, Jupyter, RStudio, and more",
+    "Desktop application with GUI for workspace management",
+    "Prebuild support for faster workspace startup",
+    "Automatic inactivity shutdown to save costs",
+    "Git and Docker credentials sync into containers",
+    "Dotfiles support for personalized environments",
+    "Extensible provider system — write your own custom providers",
+    "DevPod Pro for team/enterprise features via Kubernetes"
+  ],
+  "publicApiSurface": [
+    "devpod up [workspace-path|workspace-name]",
+    "devpod ssh [workspace-name]",
+    "devpod stop [workspace-name]",
+    "devpod delete [workspace-name]",
+    "devpod list",
+    "devpod status [workspace-name]",
+    "devpod build [workspace-path]",
+    "devpod provider add [provider-name|url]",
+    "devpod provider list",
+    "devpod provider delete [provider-name]",
+    "devpod provider update [provider-name]",
+    "devpod machine create",
+    "devpod machine list",
+    "devpod machine delete",
+    "devpod ide list",
+    "devpod ide use [ide-name]",
+    "devpod context list",
+    "devpod context use [context-name]",
+    "devpod export [workspace-name]",
+    "devpod import",
+    "devpod upgrade",
+    "devpod troubleshoot",
+    "provider.yaml exec.command",
+    "provider.yaml exec.create",
+    "provider.yaml exec.delete",
+    "provider.yaml exec.start",
+    "provider.yaml exec.stop",
+    "provider.yaml exec.status",
+    "provider.yaml options",
+    "provider.yaml agent",
+    "provider.yaml binaries"
+  ]
+}

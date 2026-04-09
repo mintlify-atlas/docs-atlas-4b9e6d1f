@@ -1,0 +1,76 @@
+---
+title: "What are workspaces? DevPod environments explained"
+description: "A DevPod workspace is a containerized dev environment defined by devcontainer.json and run on a provider. Learn about sources, lifecycle, and configuration."
+---
+
+A workspace in DevPod is a containerized development environment that holds the source code of a project along with everything needed to work on it — compilers, debuggers, runtimes, and tooling. The underlying container runs on a provider, which can be a local Docker engine, a remote virtual machine, a Kubernetes cluster, or any SSH-reachable machine. Because DevPod manages the connection between your IDE and the container, the developer experience stays consistent regardless of where the container is running.
+
+## What defines a workspace
+
+Every workspace is configured through a [`devcontainer.json`](/workspaces/devcontainer-json) file. This is the same open standard used by GitHub Codespaces and VS Code Dev Containers, so you can reuse existing configurations directly in DevPod. If DevPod cannot find a `devcontainer.json` in your project, it automatically detects the programming language and applies a suitable default configuration.
+
+Each workspace has three core properties:
+
+- **ID** — a unique name used to reference the workspace in CLI commands and the desktop app
+- **Provider** — the backend that hosts the container (set at creation time and cannot be changed later)
+- **IDE configuration** — the editor DevPod opens after creating or starting the workspace (can be changed at any time)
+
+## Workspace sources
+
+You can create a workspace from three types of sources:
+
+<CardGroup cols={3}>
+  <Card title="Git repository" icon="github">
+    Point DevPod at any Git URL. DevPod clones the repo and reads the `devcontainer.json` from it. Works with public and private repositories.
+  </Card>
+  <Card title="Local folder" icon="folder">
+    Use a path on your local machine. DevPod syncs the folder into the remote environment and reads the `devcontainer.json` from it.
+  </Card>
+  <Card title="Docker image" icon="docker">
+    Specify a container image such as `golang:latest`. DevPod creates a minimal `devcontainer.json` that references the image and starts the environment.
+  </Card>
+</CardGroup>
+
+## Workspace lifecycle
+
+A workspace moves through four states:
+
+<Steps>
+  <Step title="Created">
+    DevPod pulls or builds the container image, applies features and lifecycle hooks from `devcontainer.json`, and configures SSH access. This step only happens once.
+  </Step>
+  <Step title="Running">
+    The container is active. You can connect via SSH, open your IDE, forward ports, and work normally.
+  </Step>
+  <Step title="Stopped">
+    The container is paused and no longer consumes CPU or memory. Data in the project path and mounted volumes is preserved. You can restart a stopped workspace with `devpod up`.
+  </Step>
+  <Step title="Deleted">
+    All container state is erased and the workspace entry is removed from DevPod. Depending on the provider, this may also delete the underlying VM.
+  </Step>
+</Steps>
+
+<Note>
+  Stopping a workspace preserves its state. Deleting it does not. Use `devpod stop` when you want to pause work, and `devpod delete` only when you no longer need the environment.
+</Note>
+
+## Automatic shutdown
+
+Most providers support automatic shutdown of idle workspaces to save costs. DevPod monitors activity inside the container and stops or shuts down the underlying machine after a configurable inactivity period. Official DevPod providers come pre-configured with a 5–10 minute timeout. See [stop and delete workspaces](/workspaces/stop-delete-workspace) for details on configuring this behavior.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Create a workspace" icon="plus" href="/workspaces/create-workspace">
+    Learn how to create workspaces from Git repos, local folders, and Docker images.
+  </Card>
+  <Card title="devcontainer.json reference" icon="file-code" href="/workspaces/devcontainer-json">
+    Understand the configuration file that defines your dev environment.
+  </Card>
+  <Card title="Connect to a workspace" icon="terminal" href="/workspaces/connect-to-workspace">
+    Open your workspace in VS Code, JetBrains, or via SSH.
+  </Card>
+  <Card title="Providers" icon="plug" href="/providers/what-are-providers">
+    Choose where your workspaces run — Docker, Kubernetes, or cloud VMs.
+  </Card>
+</CardGroup>

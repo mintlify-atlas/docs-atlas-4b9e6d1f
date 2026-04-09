@@ -1,0 +1,256 @@
+---
+title: "Configuring the DevPod agent in your provider.yaml"
+description: "Configure the DevPod agent in provider.yaml: inactivity timeouts, credential injection, Docker or Kubernetes driver, and auto-shutdown for machine providers."
+---
+
+When DevPod connects to an environment through a provider, it injects a copy of itself into that environment to handle workspace lifecycle tasks. This counterpart is called the **DevPod agent** and is available as `devpod agent` within the same binary. The agent is responsible for deploying the container, setting up the SSH server, forwarding credentials, and shutting down the environment when it becomes inactive.
+
+The `agent` section of your `provider.yaml` configures how the local DevPod binary should communicate with and configure its agent counterpart.
+
+<Info>
+The agent's **driver** determines how the workspace container is deployed inside the provider environment. See the [driver configuration](#driver-configuration) section below for details on Docker and Kubernetes drivers.
+</Info>
+
+## Agent section overview
+
+```yaml
+agent:
+  path: ${DEVPOD}
+  driver: docker                           # Optional, default: docker
+  local: false                             # true for local providers (docker, kubernetes)
+  inactivityTimeout: 10m
+  containerInactivityTimeout: 10m
+  injectGitCredentials: ${INJECT_GIT_CREDENTIALS}
+  injectDockerCredentials: ${INJECT_DOCKER_CREDENTIALS}
+  binaries:
+    MY_BINARY:
+      - os: linux
+        arch: amd64
+        path: https://url-to-binary.com
+        checksum: shasum-of-binary
+  exec:
+    shutdown: |-
+      ${MY_BINARY} stop
+```
+
+## Agent fields reference
+
+<ParamField path="agent.path" type="string">
+  Where to place the DevPod agent binary on the remote machine. For providers where the agent runs on the **local** machine (such as docker or kubernetes), set this to `${DEVPOD}` to reuse the local binary directly.
+
+  For machine providers that SSH into a remote VM, this should be a path on the VM where the binary can be uploaded and executed, for example `/var/lib/toolbox/devpod`.
+</ParamField>
+
+<ParamField path="agent.driver" type="string" default="docker">
+  The container runtime driver that the agent uses to deploy the workspace container. Accepted values:
+
+  - `docker` — uses the Docker daemon (default)
+  - `kubernetes` — deploys to a Kubernetes cluster
+</ParamField>
+
+<ParamField path="agent.local" type="boolean" default="false">
+  Set to `true` for providers that run containers on the local machine. When `local` is `true`, DevPod treats the local environment as the target and the agent runs as the current user process rather than being injected into a remote machine.
+
+  Both the Docker and Kubernetes built-in providers set `local: true`.
+</ParamField>
+
+<ParamField path="agent.inactivityTimeout" type="string">
+  How long the agent waits after the last user disconnects before running `agent.exec.shutdown` to stop or delete the machine. Use this for **machine providers**. Accepts duration strings such as `10m` or `1h`.
+</ParamField>
+
+<ParamField path="agent.containerInactivityTimeout" type="string">
+  How long the agent waits after the last user disconnects before stopping the container by terminating the process with pid 1. Use this for **non-machine providers** such as docker, kubernetes, or ssh. Accepts duration strings such as `10m` or `300` (seconds).
+
+  This only stops the container — it does not delete any state. DevPod will restart the container when the user reconnects.
+</ParamField>
+
+<ParamField path="agent.injectGitCredentials" type="string">
+  Whether to forward the local machine's git credentials into the workspace container. Accepts `"true"` or `"false"`, or an option reference such as `${INJECT_GIT_CREDENTIALS}`.
+</ParamField>
+
+<ParamField path="agent.injectDockerCredentials" type="string">
+  Whether to forward the local machine's Docker registry credentials into the workspace container. Accepts `"true"` or `"false"`, or an option reference such as `${INJECT_DOCKER_CREDENTIALS}`.
+</ParamField>
+
+<ParamField path="agent.exec.shutdown" type="string">
+  A shell script that the agent runs on the remote machine when `inactivityTimeout` is reached. All option values are available as environment variables, so you can use cloud API keys to call the provider's stop or delete API.
+
+  Binaries declared in `agent.binaries` are also available here.
+</ParamField>
+
+<ParamField path="agent.binaries" type="object">
+  Additional binaries to download and install **on the remote machine** (not the local machine). These binaries are available as environment variables in `agent.exec.shutdown`. The structure is identical to the top-level [`binaries`](/building-providers/binaries) section.
+</ParamField>
+
+## Auto-inactivity stop
+
+One of DevPod's most important features is automatically stopping idle environments to reduce cloud costs and resource consumption.
+
+<Tabs>
+  <Tab title="Non-machine providers">
+    For non-machine providers (docker, kubernetes, ssh), DevPod stops the container by killing the process with pid 1 after `containerInactivityTimeout` has elapsed. This preserves all state on disk — the container can be restarted cleanly when the user reconnects.
+
+    ```yaml
+    agent:
+      containerInactivityTimeout: ${INACTIVITY_TIMEOUT}
+      local: true
+    ```
+
+    The Docker and Kubernetes providers both use this mechanism.
+  </Tab>
+  <Tab title="Machine providers">
+    For machine providers, killing the container is not sufficient because the underlying VM continues to run and incur costs. DevPod provides `inactivityTimeout` and `agent.exec.shutdown` to handle this case.
+
+    DevPod tracks when the user disconnects and, after the timeout, runs the shutdown command on the remote machine. This command should call the cloud provider API to stop or delete the VM.
+
+    ```yaml
+    agent:
+      inactivityTimeout: 10m
+      binaries:
+        MY_CLOUD_BINARY:
+          - os: linux
+            arch: amd64
+            path: https://github.com/my-org/binary/releases/download/v1.0.0/binary-linux-amd64
+            checksum: abc123
+      exec:
+        shutdown: |-
+          ${MY_CLOUD_BINARY} stop --machine-id ${MACHINE_ID}
+    ```
+
+    ### Real-world examples
+
+    | Provider | Shutdown strategy |
+    |----------|-------------------|
+    | [devpod-provider-azure](https://github.com/loft-sh/devpod-provider-azure) | Runs `shutdown -t now` directly on the VM |
+    | [devpod-provider-aws](https://github.com/loft-sh/devpod-provider-aws) | Generates a temporary token locally, saves it as a hidden option, then calls the AWS API from the agent |
+    | [devpod-provider-gcloud](https://github.com/loft-sh/devpod-provider-gcloud) | Uses a temporary GCloud token in the agent to call the Google Cloud API |
+    | [devpod-provider-digitalocean](https://github.com/loft-sh/devpod-provider-digitalocean) | Deletes the entire machine (stopped machines are still billed), preserving state in a volume |
+  </Tab>
+</Tabs>
+
+## Driver configuration
+
+The `agent.driver` field tells the agent which container runtime to use. DevPod supports two drivers: Docker (default) and Kubernetes.
+
+### Docker driver
+
+The Docker driver is the default. The agent uses the Docker daemon in the target environment to run the workspace container defined by `devcontainer.json`.
+
+```yaml
+agent:
+  driver: docker
+  docker:
+    path: /usr/bin/docker   # Path to docker CLI or replacement (e.g. podman)
+    install: true           # Whether to install Docker if not present
+```
+
+<ParamField path="agent.docker.path" type="string">
+  Path to the Docker CLI binary on the target machine. Can be a Docker replacement such as Podman.
+</ParamField>
+
+<ParamField path="agent.docker.install" type="boolean">
+  Whether the agent should install Docker on the target machine if it is not already present. Set to `false` if you manage Docker installation separately.
+</ParamField>
+
+### Kubernetes driver
+
+The Kubernetes driver deploys the workspace as a pod in a Kubernetes cluster. This allows providers that provision Kubernetes clusters or namespaces to run workspaces there. DevPod also uses this driver in its built-in Kubernetes provider.
+
+```yaml
+agent:
+  driver: kubernetes
+  kubernetes:
+    kubernetesContext: ${KUBERNETES_CONTEXT}
+    kubernetesConfig: ${KUBERNETES_CONFIG}
+    kubernetesNamespace: ${KUBERNETES_NAMESPACE}
+    diskSize: ${DISK_SIZE}
+    createNamespace: true
+    clusterRole: ${CLUSTER_ROLE}
+    serviceAccount: ${SERVICE_ACCOUNT}
+    buildRepository: "ghcr.io/my-user/my-repo"
+    persistentVolumeSize: 20Gi
+```
+
+<AccordionGroup>
+  <Accordion title="Kubernetes driver fields">
+    <ParamField path="agent.kubernetes.path" type="string">
+      Path to the `kubectl` binary or a drop-in replacement.
+    </ParamField>
+    <ParamField path="agent.kubernetes.kubernetesNamespace" type="string">
+      Kubernetes namespace for workspace pods. If empty, uses the current namespace or `default`.
+    </ParamField>
+    <ParamField path="agent.kubernetes.kubernetesContext" type="string">
+      Kubernetes context to use. If empty, uses the current context.
+    </ParamField>
+    <ParamField path="agent.kubernetes.kubernetesConfig" type="string">
+      Path to the kubeconfig file. If empty, uses `~/.kube/config`.
+    </ParamField>
+    <ParamField path="agent.kubernetes.clusterRole" type="string">
+      If set, DevPod creates a role binding for the given cluster role for the workspace pod. Useful when the workspace needs Kubernetes API access.
+    </ParamField>
+    <ParamField path="agent.kubernetes.serviceAccount" type="string">
+      If set, DevPod uses this service account for the workspace pod.
+    </ParamField>
+    <ParamField path="agent.kubernetes.buildRepository" type="string">
+      Container registry for building images inside the cluster. Required for image builds via Kubernetes. Ensure you have push access to this registry.
+    </ParamField>
+    <ParamField path="agent.kubernetes.persistentVolumeSize" type="string">
+      Default size for the persistent volume used to store workspace data. Example: `20Gi`.
+    </ParamField>
+    <ParamField path="agent.kubernetes.createNamespace" type="boolean">
+      If `true`, DevPod will attempt to create the namespace if it does not exist.
+    </ParamField>
+  </Accordion>
+</AccordionGroup>
+
+### Example: minimal Kubernetes provider
+
+```yaml
+name: simple-kubernetes
+version: v0.0.1
+agent:
+  containerInactivityTimeout: 300
+  path: ${DEVPOD}
+  driver: kubernetes
+  local: true
+  kubernetes:
+    buildRepository: "ghcr.io/my-user/my-repo"
+    persistentVolumeSize: 20Gi
+    createNamespace: true
+exec:
+  command: |-
+    "${DEVPOD}" helper sh -c "${COMMAND}"
+```
+
+Add this provider with:
+
+```bash
+devpod provider add ./simple-kubernetes.yaml
+```
+
+## Agent binaries pattern
+
+The `agent.binaries` section is the recommended way to ship a helper binary that runs on the remote machine to perform cloud API calls during shutdown. This avoids the complexity of pre-installing tools on every VM.
+
+```yaml
+agent:
+  path: ${AGENT_PATH}
+  inactivityTimeout: 10m
+  binaries:
+    GCLOUD_PROVIDER:
+      - os: linux
+        arch: amd64
+        path: https://github.com/loft-sh/devpod-provider-gcloud/releases/download/v0.0.1-alpha.10/devpod-provider-gcloud-linux-amd64
+        checksum: 38f92457507563ee56ea40a2ec40196d12ac2bbd50a924d76f55827e96e5f831
+      - os: linux
+        arch: arm64
+        path: https://github.com/loft-sh/devpod-provider-gcloud/releases/download/v0.0.1-alpha.10/devpod-provider-gcloud-linux-arm64
+        checksum: 48e8dfa20962f1c3eb1e3da17d57842a0e26155df2b94377bcdf5b8070d7b17e
+  exec:
+    shutdown: |-
+      ${GCLOUD_PROVIDER} stop --raw
+```
+
+<Note>
+The `agent.binaries` section uses the same syntax as the top-level `binaries` section. See [Binaries](/building-providers/binaries) for the full field reference.
+</Note>

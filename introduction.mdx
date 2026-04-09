@@ -1,0 +1,72 @@
+---
+title: "DevPod: open-source Codespaces for any cloud or local backend"
+description: "DevPod is a client-only tool that creates reproducible developer environments using devcontainer.json on Docker, Kubernetes, cloud VMs, or any remote machine."
+---
+
+DevPod gives you the developer experience of GitHub Codespaces — reproducible, containerized environments defined in code — without locking you into any cloud provider. It runs entirely on your local machine, connects to any backend you choose, and works with every major IDE.
+
+<CardGroup cols={2}>
+  <Card title="Install DevPod" icon="download" href="/getting-started/install">
+    Get the desktop app or CLI for macOS, Windows, and Linux in minutes.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/getting-started/quickstart">
+    Create your first workspace and open it in VS Code in under two minutes.
+  </Card>
+  <Card title="What are Workspaces?" icon="box" href="/workspaces/what-are-workspaces">
+    Learn how DevPod manages isolated, reproducible dev environments.
+  </Card>
+  <Card title="What are Providers?" icon="plug" href="/providers/what-are-providers">
+    Understand how providers connect DevPod to Docker, Kubernetes, and cloud VMs.
+  </Card>
+</CardGroup>
+
+## Why DevPod?
+
+DevPod reuses the open [DevContainer standard](https://containers.dev/) — the same standard used by GitHub Codespaces and VS Code Dev Containers — so your environment definition works everywhere.
+
+<CardGroup cols={2}>
+  <Card title="No vendor lock-in" icon="shield-check">
+    Switch providers with a single command. Your `devcontainer.json` works on any backend.
+  </Card>
+  <Card title="Client-only" icon="laptop">
+    No server to deploy or maintain. DevPod runs entirely on your machine.
+  </Card>
+  <Card title="Cost savings" icon="piggy-bank">
+    Use bare VMs on any cloud — typically 5–10× cheaper than hosted Codespaces alternatives.
+  </Card>
+  <Card title="Any IDE" icon="code">
+    VS Code, JetBrains suite, Zed, Cursor, Jupyter, RStudio — connect any tool via SSH.
+  </Card>
+</CardGroup>
+
+## How it works
+
+DevPod acts as the glue between your local IDE and the machine where you want to develop. You define your environment once in `devcontainer.json`, then DevPod spins it up on whatever backend you configure — locally with Docker, on a Kubernetes cluster, or on a cloud VM.
+
+<Steps>
+  <Step title="Install DevPod">
+    Download the desktop app or install the CLI for your operating system.
+  </Step>
+  <Step title="Add a provider">
+    Connect DevPod to Docker, Kubernetes, AWS, GCP, Azure, or any SSH-reachable machine.
+  </Step>
+  <Step title="Start a workspace">
+    Point DevPod at a Git repository or local folder. It reads the `devcontainer.json` and builds the environment.
+  </Step>
+  <Step title="Open your IDE">
+    DevPod automatically opens VS Code, a JetBrains IDE, or any configured IDE connected to the running container.
+  </Step>
+</Steps>
+
+## Key features
+
+- **Prebuilds** — pre-build workspace images to skip setup time on every `devpod up`
+- **Dotfiles** — automatically clone and install your dotfiles into every workspace
+- **Credential sync** — Git and Docker credentials are injected into the container automatically
+- **Inactivity timeout** — containers shut down automatically after a configurable idle period
+- **Desktop app** — manage workspaces, providers, and settings through a polished GUI
+- **Extensible providers** — write custom providers for any infrastructure using a simple `provider.yaml`
+
+<Info>
+  DevPod Pro extends DevPod with team collaboration, centralized workspace management, and enterprise Kubernetes support. [Learn more](https://devpod.sh/pro).
+</Info>

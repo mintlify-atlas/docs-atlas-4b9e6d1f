@@ -1,0 +1,128 @@
+---
+title: "How DevPod works: client-agent architecture and SSH tunnel"
+description: Deep-dive into DevPod's client-only architecture, the agent model, SSH tunnel, devcontainer build pipeline, credential injection, and inactivity daemon.
+---
+
+DevPod is a client-only tool: there is no persistent server process to run or manage. The CLI and Desktop app wrap conventional tooling such as `docker`, `kubectl`, and cloud-provider CLIs, using them to deploy a devcontainer and then connect your local IDE to it over SSH. All coordination happens from your local machine; the only remote process is the DevPod agent, which the CLI injects on demand.
+
+## High-level architecture
+
+DevPod uses a **client-agent** architecture, similar to a browser–server model where the "front end" (the agent) is deployed and executed on a remote host.
+
+This design has two important properties:
+
+- There can be no version mismatch between client and agent because the CLI always injects the version of the agent that matches itself.
+- Users have no infrastructure to manage beyond the providers they configure.
+
+When you run `devpod up`, the CLI:
+
+1. Selects the configured provider for the current context.
+2. Optionally creates or starts a machine (for VM-backed providers).
+3. Injects the DevPod agent binary into the target machine.
+4. Directs the agent to build and start the devcontainer.
+5. Establishes an SSH tunnel back to the running container.
+6. Launches your local IDE and connects it through the tunnel.
+
+## Providers and the tunnel
+
+Each provider implements a vendor-specific communication channel called the **tunnel**. For example:
+
+- A **Docker** provider communicates through the local Docker daemon.
+- A **Kubernetes** provider uses `kubectl exec` through the Kubernetes control plane.
+- An **AWS** provider may use EC2 Instance Connect.
+
+The tunnel is how the CLI sends commands to the target machine and how it establishes the SSH connection that the IDE uses. Because the tunnel is provider-specific, DevPod can work with any infrastructure without requiring public network access to the workspace.
+
+<Note>
+Port forwarding requires an active SSH connection to the container. When running with `--ide none`, keep an SSH session open with `devpod ssh <workspace>` to enable port forwarding.
+</Note>
+
+## The DevPod agent
+
+The agent is a standalone binary that the CLI copies into the target machine the first time a workspace is created. After injection the CLI runs:
+
+```bash
+devpod agent workspace up --workspace-info '<serialized-spec>'
+```
+
+The agent then:
+
+1. Uses the machine's control plane (Docker daemon or Kubernetes API server) to build and start the devcontainer.
+2. Starts an SSH server bound to `stdio` of the secure tunnel connection.
+3. Optionally installs a **daemon** process to monitor inactivity.
+
+Because the agent is injected by the CLI and matched to the CLI version, there is no separate agent upgrade step.
+
+## Building workspaces
+
+<Steps>
+  <Step title="Parse devcontainer.json">
+    The agent reads `devcontainer.json` from the project source and extracts build configuration: the base image or Dockerfile, any declared [devcontainer features](https://containers.dev/features), and lifecycle hooks.
+  </Step>
+  <Step title="Assemble the Dockerfile">
+    Features are appended as additional build stages to the base Dockerfile. The resulting multi-stage Dockerfile is handed to the build engine.
+  </Step>
+  <Step title="Build with Docker, BuildKit, or Kaniko">
+    Depending on the provider and environment, DevPod builds the image using Docker, BuildKit, or Kaniko. The build runs on the target machine so the image never needs to be transferred across the network.
+  </Step>
+  <Step title="Push to registry (optional)">
+    When `--repository` is passed to `devpod build` or `devpod up`, the resulting image is pushed to the registry so that future workspace creations can skip the build step by using `--prebuild-repository`.
+  </Step>
+</Steps>
+
+## SSH tunnel for IDE connectivity
+
+After the container is running, the CLI establishes an SSH connection through the provider tunnel:
+
+1. The agent starts an SSH server on `stdio`.
+2. The CLI uses the provider's secure channel (e.g. `kubectl exec`) to connect to that server.
+3. Local port-forwarding over this SSH connection makes the workspace appear as `<workspace-name>.devpod` in `~/.ssh/config` (when `--configure-ssh` is enabled).
+4. The IDE connects to `ssh <workspace-name>.devpod` directly, with no additional setup.
+
+The `~/.ssh/config` entry is written by `devpod up` and updated by `devpod ssh`. You can also configure this path with `--ssh-config`.
+
+## Credential injection
+
+DevPod injects credentials from your local environment into the container so that standard tooling "just works" inside the workspace.
+
+<Tabs>
+  <Tab title="Git credentials">
+    When the context option `SSH_INJECT_GIT_CREDENTIALS` is enabled, DevPod forwards a git credential helper into the container over the SSH tunnel. Any `git push` or `git fetch` inside the workspace uses your local git credentials without storing them on the remote host.
+  </Tab>
+  <Tab title="Docker credentials">
+    When `SSH_INJECT_DOCKER_CREDENTIALS` is enabled, DevPod forwards Docker registry credentials into the container. Pulling private images from inside the devcontainer works transparently.
+  </Tab>
+  <Tab title="GPG agent">
+    Pass `--gpg-agent-forwarding` to `devpod up` or `devpod ssh`, or enable it globally with `devpod context set-options -o GPG_AGENT_FORWARDING=true`. DevPod reverse-forwards the local gpg-agent extra socket into the container so that `git commit -S` and other GPG operations work inside the workspace.
+  </Tab>
+  <Tab title="SSH agent">
+    SSH agent forwarding is enabled by default (`--agent-forwarding=true` on `devpod ssh`). Local SSH keys are forwarded to the container when an SSH session is open.
+  </Tab>
+</Tabs>
+
+## Inactivity daemon
+
+Unless `--disable-daemon` is passed to `devpod up`, the agent installs a lightweight daemon process on the target machine after the container starts. The daemon tracks activity in the container (file system events, process activity, network I/O) and puts the machine or container to sleep after a configurable period of inactivity. This is particularly useful for cloud VM providers where idle machines incur cost.
+
+## Dotfiles support
+
+DevPod clones a dotfiles repository into the container after it starts. Specify the repository with `--dotfiles` on `devpod up` or set a default in your context:
+
+```bash
+devpod context set-options -o DOTFILES_URL=https://github.com/me/dotfiles
+```
+
+DevPod auto-detects common install scripts (`install.sh`, `setup.sh`, etc.) or you can specify one explicitly with `--dotfiles-script`. Environment variables can be passed to the script with `--dotfiles-script-env`.
+
+## DevPod Pro and platform mode
+
+In DevPod Pro (the hosted platform), workspace management is handled by a central platform daemon rather than driven entirely from the local CLI. The key differences are:
+
+- The CLI communicates with the platform's API instead of managing the provider directly.
+- Workspace state and lifecycle are controlled by the platform, enabling team collaboration, RBAC, and audit logging.
+- The CLI enters **platform mode** automatically when a Pro provider is configured. Output is redirected to the error stream so the platform UI can parse the structured JSON result.
+- IDE launching from the CLI still works, but browser-based IDEs (openvscode, jupyternotebook, rstudio) do not forward the SSH auth socket in platform mode.
+
+<Info>
+When using DevPod Pro, the provider upgrade check runs automatically. If the platform has a newer DevPod version, the provider is updated before the workspace operation proceeds.
+</Info>

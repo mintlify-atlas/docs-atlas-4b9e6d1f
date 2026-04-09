@@ -1,0 +1,253 @@
+---
+title: "Build your first DevPod provider: step-by-step quickstart"
+description: "Learn how to build a DevPod provider from scratch. Create a minimal provider.yaml, understand exec commands, and test your provider locally in minutes."
+---
+
+A DevPod provider is a small program described by a `provider.yaml` manifest that tells DevPod how to create, access, and manage developer environments. Providers can be as simple as a one-line shell script that reuses your local machine, or as complex as a full CLI binary that provisions cloud VMs. This guide walks you through building a minimal working provider and explains every moving part along the way.
+
+<Info>
+Before building a provider, familiarize yourself with [what providers are](/providers/what-are-providers) and how to [add and manage them](/providers/add-provider). The official DevPod providers are also a great reference for real-world patterns.
+</Info>
+
+## Minimal provider example
+
+The simplest possible provider reuses the local environment — it runs workspace commands directly in a local shell. Here is the complete `provider.yaml`:
+
+```yaml
+name: my-first-provider  # Required: name of the provider
+version: v0.0.1          # Required: version of the provider
+agent:                   # DevPod agent options
+  path: ${DEVPOD}        # Use the local DevPod binary as the agent
+exec:
+  # command is required: tells DevPod how to run commands in the environment.
+  # ${COMMAND} is a placeholder DevPod fills in at runtime.
+  command: |-
+    sh -c "${COMMAND}"
+```
+
+Save this to a file called `provider.yaml`, then add and test it:
+
+```bash
+devpod provider add ./provider.yaml
+devpod up github.com/microsoft/vscode-remote-try-go
+```
+
+That's all it takes for a working non-machine provider.
+
+## Step-by-step walkthrough
+
+<Steps>
+  <Step title="Create the provider.yaml file">
+    Create a directory for your provider and add a `provider.yaml`. At minimum you need `name`, `version`, and `exec.command`:
+
+    ```yaml
+    name: my-first-provider
+    version: v0.0.1
+    description: My first DevPod provider  # Optional, shown in the Desktop App
+    icon: https://example.com/icon.svg      # Optional, shown in the Desktop App
+    agent:
+      path: ${DEVPOD}
+    exec:
+      command: |-
+        sh -c "${COMMAND}"
+    ```
+  </Step>
+
+  <Step title="Add the provider to DevPod">
+    Point `devpod provider add` at your local file. DevPod reads the manifest and registers the provider:
+
+    ```bash
+    devpod provider add ./path/to/provider.yaml
+    ```
+
+    You can also add a provider directly from a GitHub URL or a versioned release:
+
+    ```bash
+    devpod provider add github.com/loft-sh/devpod-provider-ssh
+    ```
+  </Step>
+
+  <Step title="Start a workspace">
+    Use the provider with `devpod up`. If you named your provider `my-first-provider`, pass `--provider` explicitly or set it as the default:
+
+    ```bash
+    devpod up github.com/microsoft/vscode-remote-try-go --provider my-first-provider
+    ```
+  </Step>
+
+  <Step title="Iterate and test">
+    Edit your `provider.yaml` and update the registered provider:
+
+    ```bash
+    devpod provider update my-first-provider ./path/to/provider.yaml
+    ```
+
+    Use `devpod provider options my-first-provider` to inspect all configured option values.
+  </Step>
+</Steps>
+
+## The exec section
+
+The `exec` section is the core of any provider. It contains POSIX shell scripts that DevPod executes to interact with the environment.
+
+<Warning>
+On Unix systems DevPod runs exec scripts in a native POSIX shell. On Windows, DevPod uses an [emulated POSIX shell](https://github.com/mvdan/sh) for compatibility. Not all Unix utilities (`grep`, `sed`, `awk`, etc.) are available in the emulated shell. If your provider needs these, ship them as a helper binary via the [`binaries` section](/building-providers/binaries).
+</Warning>
+
+### Available exec commands
+
+<AccordionGroup>
+  <Accordion title="command (required)">
+    The only required exec command. Defines how to run a command inside the environment. DevPod injects `${COMMAND}` at runtime and routes all communication through the command's stdin/stdout.
+
+    ```yaml
+    exec:
+      command: |-
+        sh -c "${COMMAND}"
+    ```
+
+    For a remote SSH provider this becomes:
+
+    ```yaml
+    exec:
+      command: |-
+        ssh -oStrictHostKeyChecking=no \
+            -p ${PORT} \
+            "${EXTRA_FLAGS}" \
+            "${HOST}" \
+            "${COMMAND}"
+    ```
+  </Accordion>
+
+  <Accordion title="init (optional)">
+    Runs once when the provider is first used or when options change. Use it to validate configuration — check that required tools are installed, credentials are valid, and the target is reachable.
+
+    ```yaml
+    exec:
+      init: |-
+        OUTPUT=$(ssh -oStrictHostKeyChecking=no \
+                     -p ${PORT} \
+                     ${EXTRA_FLAGS} \
+                     "${HOST}" \
+                     'sh -c "echo DevPodTest"')
+
+        if [ "$OUTPUT" != "DevPodTest" ]; then
+          >&2 echo "Unexpected ssh output. Please check your SSH configuration."
+          exit 1
+        fi
+    ```
+  </Accordion>
+
+  <Accordion title="create / delete (machine providers only)">
+    `create` provisions a new remote machine. `delete` tears it down. Defining `create` automatically marks the provider as a **machine provider** — DevPod will also expect `delete` to be present.
+
+    ```yaml
+    exec:
+      create: ${MY_PROVIDER_BINARY} create
+      delete: ${MY_PROVIDER_BINARY} delete
+    ```
+  </Accordion>
+
+  <Accordion title="start / stop (machine providers only)">
+    Start and stop a previously created machine without destroying it. Only meaningful for machine providers.
+
+    ```yaml
+    exec:
+      start: ${MY_PROVIDER_BINARY} start
+      stop:  ${MY_PROVIDER_BINARY} stop
+    ```
+  </Accordion>
+
+  <Accordion title="status (machine providers only)">
+    Returns the current state of the machine. DevPod expects exactly one of the following strings on stdout:
+
+    | Value | Meaning |
+    |-------|---------|
+    | `Running` | Machine is running and ready |
+    | `Busy` | Machine is transitioning (starting, stopping, terminating) |
+    | `Stopped` | Machine is stopped |
+    | `NotFound` | Machine does not exist |
+
+    ```yaml
+    exec:
+      status: ${MY_PROVIDER_BINARY} status
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Environment variables in exec scripts
+
+Every exec script has access to the following variables:
+
+| Variable | Description |
+|----------|-------------|
+| `${DEVPOD}` | Absolute path to the local DevPod binary |
+| `${COMMAND}` | The command DevPod wants to run (only in `exec.command`) |
+| `${AGENT_PATH}` | Path where the agent binary should be placed on the remote |
+| `${MY_OPTION}` | Any option you define in the `options` section (uppercased key) |
+| `${MY_BINARY}` | Any binary you declare in the `binaries` section (uppercased key) |
+
+## Machine vs non-machine providers
+
+<Tabs>
+  <Tab title="Non-machine provider">
+    A non-machine provider does not manage any VM lifecycle. It only needs `exec.command` (and optionally `exec.init`). DevPod runs containers directly in the target environment — for example, using the local Docker daemon or SSHing into a pre-existing server.
+
+    **Supported exec commands:** `command`, `init`
+
+    ```yaml
+    name: my-ssh-provider
+    version: v0.0.1
+    agent:
+      path: ${DEVPOD}
+      containerInactivityTimeout: 10m
+    exec:
+      init: |-
+        ssh "${HOST}" 'echo ok'
+      command: |-
+        ssh "${HOST}" "${COMMAND}"
+    ```
+  </Tab>
+
+  <Tab title="Machine provider">
+    A machine provider manages the full lifecycle of a remote VM. Defining `exec.create` is the signal to DevPod that this is a machine provider. All six exec commands are available.
+
+    **Supported exec commands:** `command`, `init`, `create`, `delete`, `start`, `stop`, `status`
+
+    ```yaml
+    name: my-cloud-provider
+    version: v0.0.1
+    agent:
+      path: ${AGENT_PATH}
+      inactivityTimeout: 10m
+    exec:
+      init:   ${MY_BINARY} init
+      create: ${MY_BINARY} create
+      delete: ${MY_BINARY} delete
+      start:  ${MY_BINARY} start
+      stop:   ${MY_BINARY} stop
+      status: ${MY_BINARY} status
+      command: |-
+        ssh -oStrictHostKeyChecking=no "${HOST}" "${COMMAND}"
+    ```
+  </Tab>
+</Tabs>
+
+## Full provider.yaml reference
+
+Once you have the basics working, explore the other sections of the manifest:
+
+<CardGroup cols={2}>
+  <Card title="provider.yaml schema" icon="file-code" href="/building-providers/provider-yaml">
+    Complete field reference for every section of the manifest.
+  </Card>
+  <Card title="Options" icon="sliders" href="/building-providers/options">
+    Define user-configurable settings passed as environment variables.
+  </Card>
+  <Card title="Agent" icon="robot" href="/building-providers/agent">
+    Configure the DevPod agent: inactivity timeouts, credential injection, and drivers.
+  </Card>
+  <Card title="Binaries" icon="download" href="/building-providers/binaries">
+    Ship platform-specific helper binaries alongside your provider.
+  </Card>
+</CardGroup>

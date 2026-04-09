@@ -1,0 +1,203 @@
+---
+title: "Add a DevPod provider from GitHub, file, or URL"
+description: "Install providers from a short name, GitHub repository, local file, or URL — then configure options like region, instance type, and inactivity timeout."
+---
+
+Providers are installed with the `devpod provider add` command followed by a source — a short name for built-in providers, a GitHub repository slug, a local file path, or a direct URL to a `provider.yaml`. Once added, DevPod automatically sets the provider as your default and prompts for any required options.
+
+## Add a built-in provider
+
+DevPod ships with `docker`, `kubernetes`, and `pro` providers that can be installed by name without specifying a URL.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    devpod provider add docker
+    devpod provider add kubernetes
+    ```
+  </Tab>
+  <Tab title="Desktop App">
+    1. Open the **Providers** view in the sidebar.
+    2. Click the **Add** button in the top-right corner.
+    3. Select a provider from the list of defaults, or click the **+** button to enter a custom source.
+    4. Fill in any required options when prompted.
+
+    <Note>
+      The desktop application calls `devpod provider add <name>` under the hood — all options configured in the UI are passed as `-o KEY=VALUE` flags.
+    </Note>
+  </Tab>
+</Tabs>
+
+You can also list all available first-party providers at any time:
+
+```bash
+devpod provider list-available
+```
+
+## Add a provider from GitHub
+
+Community and third-party providers hosted on GitHub can be installed using the `owner/repo` shorthand. DevPod fetches the `provider.yaml` from the repository's latest release automatically.
+
+```bash
+devpod provider add loft-sh/devpod-provider-aws
+devpod provider add loft-sh/devpod-provider-gcloud
+devpod provider add loft-sh/devpod-provider-azure
+devpod provider add loft-sh/devpod-provider-digitalocean
+devpod provider add loft-sh/devpod-provider-ssh
+devpod provider add mrsimonemms/devpod-provider-hetzner
+```
+
+To install a specific release version instead of the latest:
+
+```bash
+devpod provider add loft-sh/devpod-provider-aws@v0.4.1
+```
+
+<Info>
+  DevPod supports private GitHub repositories. It uses your local HTTPS credentials, so as long as you are authenticated with `git`, private providers will be fetched automatically.
+</Info>
+
+## Add a provider from a local file
+
+If you have a `provider.yaml` on disk — for example, a provider you are developing locally — point DevPod directly at the file path:
+
+```bash
+devpod provider add ./providers/my-custom-provider/provider.yaml
+```
+
+## Add a provider from a URL
+
+You can also pass a direct HTTPS URL to a `provider.yaml`:
+
+```bash
+devpod provider add https://github.com/loft-sh/devpod-provider-ssh/releases/download/v0.0.3/provider.yaml
+```
+
+## Configure provider options
+
+Each provider defines its own set of options in `provider.yaml`. Required options are prompted interactively when you add the provider. Optional options have defaults and can be set at add time or changed later.
+
+### Set options at add time
+
+Pass options using the `-o` / `--option` flag:
+
+```bash
+devpod provider add loft-sh/devpod-provider-aws -o AWS_REGION=us-east-1
+devpod provider add loft-sh/devpod-provider-aws -o AWS_REGION=eu-west-1 -o AWS_INSTANCE_TYPE=t3.large
+```
+
+### View current options
+
+```bash
+devpod provider options aws
+```
+
+Example output:
+
+```
+          NAME            | REQUIRED |          DESCRIPTION           |         DEFAULT         |          VALUE
+----------------------------+----------+--------------------------------+-------------------------+--------------------------
+AWS_ACCESS_KEY_ID         | false    | The AWS access key id          |                         |
+AWS_AMI                   | false    | The disk image to use.         |                         |
+AWS_DISK_SIZE             | false    | The disk size to use.          | 40                      | 40
+AWS_INSTANCE_TYPE         | false    | The machine type to use.       | c5.xlarge               | c5.xlarge
+AWS_REGION                | true     | The AWS cloud region to create |                         | us-west-2
+                          |          | the VM in. E.g. us-west-1      |                         |
+INACTIVITY_TIMEOUT        | false    | If defined, will automatically | 10m                     | 10m
+                          |          | stop the VM after the          |                         |
+                          |          | inactivity period.             |                         |
+INJECT_DOCKER_CREDENTIALS | false    | If DevPod should inject docker | true                    | true
+INJECT_GIT_CREDENTIALS    | false    | If DevPod should inject git    | true                    | true
+```
+
+### Update options after installation
+
+```bash
+devpod provider set-options aws -o AWS_DISK_SIZE=120
+devpod provider set-options aws -o AWS_INSTANCE_TYPE=t3.xlarge -o AWS_REGION=ap-southeast-1
+```
+
+Or reconfigure all options interactively:
+
+```bash
+devpod provider use aws --reconfigure
+```
+
+## Docker provider options
+
+The `docker` provider supports the following options, all of which are optional:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `DOCKER_PATH` | `docker` | Path to the Docker binary on your system |
+| `DOCKER_HOST` | — | Docker host to connect to (e.g., `tcp://remote-host:2376`) |
+| `DOCKER_BUILDER` | — | Docker builder to use (e.g., a BuildKit builder name) |
+| `INACTIVITY_TIMEOUT` | — | Automatically stop the container after idle (e.g., `10m`, `1h`) |
+
+Example — use a remote Docker host and stop containers after 30 minutes of inactivity:
+
+```bash
+devpod provider add docker -o DOCKER_HOST=tcp://192.168.1.10:2376 -o INACTIVITY_TIMEOUT=30m
+```
+
+## Kubernetes provider options
+
+The `kubernetes` provider has a richer set of options for cluster integration:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `KUBERNETES_NAMESPACE` | `devpod` | Namespace where workspace pods are created |
+| `KUBERNETES_CONTEXT` | — | Kubeconfig context to use |
+| `KUBERNETES_CONFIG` | — | Path to a custom kubeconfig file |
+| `DISK_SIZE` | `10Gi` | Size of the persistent volume claim for each workspace |
+| `STORAGE_CLASS` | — | Storage class for the persistent volume claim |
+| `CLUSTER_ROLE` | — | Cluster role to bind to the workspace service account |
+| `INACTIVITY_TIMEOUT` | — | Automatically stop the pod after idle (e.g., `10m`, `1h`) |
+| `RESOURCES` | — | CPU/memory requests and limits (e.g., `requests.cpu=500m,limits.memory=4Gi`) |
+| `NODE_SELECTOR` | — | Node selector labels for workspace pod scheduling |
+| `CREATE_NAMESPACE` | `true` | Create the namespace if it does not exist |
+
+Example — deploy to a specific namespace with a 20Gi disk and 4Gi memory limit:
+
+```bash
+devpod provider add kubernetes \
+  -o KUBERNETES_NAMESPACE=dev-environments \
+  -o DISK_SIZE=20Gi \
+  -o RESOURCES=limits.memory=4Gi
+```
+
+## Add multiple instances of the same provider
+
+Use the `--name` flag to register the same provider type more than once with different configurations. This is useful when you need separate providers for different regions, accounts, or instance sizes.
+
+```bash
+devpod provider add loft-sh/devpod-provider-aws --name aws-us -o AWS_REGION=us-east-1
+devpod provider add loft-sh/devpod-provider-aws --name aws-eu -o AWS_REGION=eu-west-1
+devpod provider add loft-sh/devpod-provider-aws --name aws-gpu -o AWS_INSTANCE_TYPE=p3.8xlarge
+```
+
+## Set a provider as the default
+
+When you create a workspace without specifying a provider, DevPod uses the default. To make an installed provider the default:
+
+```bash
+devpod use provider aws
+```
+
+<Tip>
+  Adding a provider with `devpod provider add` automatically makes it the default. Run `devpod use provider <name>` only if you want to switch the default to an already-installed provider.
+</Tip>
+
+## Use a single machine for all workspaces
+
+By default, DevPod provisions a separate machine for each workspace when using a machine provider. To reuse a single machine across all workspaces, enable single-machine mode:
+
+```bash
+devpod provider use aws --single-machine
+```
+
+Or at add time:
+
+```bash
+devpod provider add loft-sh/devpod-provider-aws --single-machine -o AWS_REGION=us-east-1
+```

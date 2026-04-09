@@ -1,0 +1,188 @@
+---
+title: "devcontainer.json configuration reference for DevPod"
+description: "Learn how DevPod uses devcontainer.json to configure dev containers. Covers file placement, key fields, features, lifecycle hooks, and the development workflow."
+---
+
+DevPod uses the open [devcontainer.json standard](https://containers.dev/) to configure development containers. A `devcontainer.json` file describes everything about your environment: the base image or Dockerfile to use, tools and extensions to install, ports to forward, and commands to run at various lifecycle stages. Because DevPod implements the same standard as GitHub Codespaces and VS Code Dev Containers, any existing configuration works in DevPod without modification.
+
+<Info>
+  The same `devcontainer.json` format is used by VS Code and GitHub Codespaces. Existing configurations from those tools work in DevPod out of the box.
+</Info>
+
+## File placement
+
+DevPod looks for `devcontainer.json` in the following locations within your project, in order:
+
+- `.devcontainer/devcontainer.json`
+- `.devcontainer.json`
+- `.devcontainer/<any-subfolder>/devcontainer.json`
+
+To use a file at a custom path, pass the `--devcontainer-path` flag:
+
+```bash
+devpod up github.com/my-org/my-repo --devcontainer-path ./my-path/devcontainer.json
+```
+
+<Note>
+  A `devcontainer.json` cannot import or inherit settings from other `devcontainer.json` files. All referenced files and directories must be within the same configuration subdirectory.
+</Note>
+
+## Using a Docker image
+
+The simplest configuration specifies a base image directly:
+
+```json
+{
+  "name": "my-project",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11"
+}
+```
+
+## Using a Dockerfile
+
+To build a custom image, reference a Dockerfile in the `build` block:
+
+```json
+{
+  "build": {
+    "dockerfile": "Dockerfile"
+  }
+}
+```
+
+The `Dockerfile` lives in the same directory as `devcontainer.json` and can install any additional tooling:
+
+```dockerfile
+FROM mcr.microsoft.com/vscode/devcontainers/javascript-node:0-16-buster
+
+RUN apt-get update && apt-get install -y vim
+```
+
+## Adding features
+
+Features are reusable, composable configuration units that install tooling on top of your base image — without writing Dockerfile instructions by hand. A full list of available features is at [containers.dev/features](https://containers.dev/features).
+
+```json
+{
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {}
+  }
+}
+```
+
+### Adding HTTP headers for feature downloads
+
+DevPod can add HTTP headers when downloading feature archives from private registries. Configure them in the `customizations.devpod.featureDownloadHTTPHeaders` field:
+
+```json
+{
+  "features": {
+    "https://example.com/my-feature.tar.gz": []
+  },
+  "customizations": {
+    "devpod": {
+      "featureDownloadHTTPHeaders": {
+        "Authorization": "${env:MY_TOKEN}",
+        "X-Custom-Header": "value"
+      }
+    }
+  }
+}
+```
+
+## Lifecycle hooks
+
+DevPod runs commands at specific points during workspace creation and connection. These hooks are defined as properties in `devcontainer.json`:
+
+| Hook | When it runs |
+|---|---|
+| `onCreateCommand` | Once, when the container is first created |
+| `postCreateCommand` | Once, after the container is created and the source code is available |
+| `postStartCommand` | Every time the container starts |
+| `postAttachCommand` | Every time a tool attaches to the running container |
+
+Example:
+
+```json
+{
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "postCreateCommand": "npm install",
+  "postStartCommand": "echo 'Container started'"
+}
+```
+
+<Warning>
+  The following `devcontainer.json` properties are not currently supported in DevPod and will be ignored: `userEnvProve`, `waitFor`, and parallel lifecycle scripts.
+</Warning>
+
+## Key configuration fields
+
+<AccordionGroup>
+  <Accordion title="remoteUser">
+    Sets the user that tools and lifecycle commands run as inside the container.
+
+    ```json
+    {
+      "remoteUser": "vscode"
+    }
+    ```
+  </Accordion>
+  <Accordion title="forwardPorts">
+    Lists ports to forward from the container to your local machine.
+
+    ```json
+    {
+      "forwardPorts": [3000, 5432]
+    }
+    ```
+  </Accordion>
+  <Accordion title="mounts">
+    Adds extra volume or bind mounts to the container.
+
+    ```json
+    {
+      "mounts": [
+        "source=${localWorkspaceFolder}/.cache,target=/home/vscode/.cache,type=bind"
+      ]
+    }
+    ```
+  </Accordion>
+  <Accordion title="customizations.vscode.extensions">
+    Installs VS Code extensions automatically when connecting with VS Code.
+
+    ```json
+    {
+      "customizations": {
+        "vscode": {
+          "extensions": [
+            "golang.Go",
+            "esbenp.prettier-vscode"
+          ]
+        }
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Iterating on devcontainer.json
+
+When you change `devcontainer.json` — adding features, updating the Dockerfile, or changing mounts — use `devpod up --recreate` to apply the changes without deleting the workspace:
+
+```bash
+devpod up my-workspace --recreate
+```
+
+DevPod rebuilds the container with the new configuration. If the rebuild fails, the existing workspace is not affected. The Desktop app equivalent is the **Rebuild** button.
+
+<Warning>
+  Recreating a workspace removes changes made inside the container overlay (anything outside the project path and mounted volumes). Files within the project path are always preserved.
+</Warning>
+
+## Additional references
+
+- [DevContainer JSON reference](https://containers.dev/implementors/json_reference/)
+- [VS Code Dev Containers documentation](https://code.visualstudio.com/docs/devcontainers/create-dev-container)
+- [GitHub Codespaces documentation](https://docs.github.com/en/codespaces/setting-up-your-project-for-codespaces/adding-a-dev-container-configuration/introduction-to-dev-containers)

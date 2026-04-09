@@ -1,0 +1,156 @@
+---
+title: "Connect to a DevPod workspace via SSH, IDE, or browser"
+description: "Connect to a running DevPod workspace using VS Code, JetBrains Gateway, SSH, or devpod ssh. Covers IDE setup, SSH config, and devpod ssh flags."
+---
+
+After a workspace is created, DevPod automatically adds an SSH entry named `WORKSPACE_NAME.devpod` to your `~/.ssh/config`. This allows any SSH-capable tool — including every major IDE — to connect to the workspace directly. If you configured an IDE when creating the workspace, DevPod opens it automatically after `devpod up` completes.
+
+<Info>
+  To change the default IDE globally, run `devpod ide use vscode` (replace `vscode` with your preferred IDE name). To override the IDE for a single workspace, pass `--ide` to `devpod up`.
+</Info>
+
+## Reopen a workspace in an IDE
+
+Running `devpod up` on an already-created workspace starts it (if stopped) and reopens the IDE:
+
+```bash
+devpod up my-workspace
+```
+
+To open it in a different IDE than the one configured:
+
+```bash
+devpod up my-workspace --ide goland
+```
+
+## Connect with VS Code
+
+Make sure you have the [Remote - SSH extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh) and the `code` CLI installed. Then open the workspace directly:
+
+```bash
+devpod up my-workspace --ide vscode
+```
+
+DevPod writes the SSH host `my-workspace.devpod` to your SSH config, so you can also connect manually via **Remote-SSH: Connect to Host** in VS Code and selecting `my-workspace.devpod`.
+
+## Connect with VS Code in a browser
+
+DevPod uses the open-source [openvscode-server](https://github.com/gitpod-io/openvscode-server) to run VS Code in a browser:
+
+```bash
+devpod up my-workspace --ide openvscode
+```
+
+To use a specific version of openvscode-server:
+
+```bash
+devpod up my-workspace --ide openvscode --ide-option VERSION=v1.76.2
+```
+
+## Connect with JetBrains IDEs
+
+Make sure [JetBrains Gateway](https://www.jetbrains.com/remote-development/gateway/) is installed and you have a valid JetBrains subscription for the IDE you want to use. Supported IDEs:
+
+| IDE | Flag value |
+|---|---|
+| CLion | `clion` |
+| GoLand | `goland` |
+| IntelliJ IDEA | `intellij` |
+| PhpStorm | `phpstorm` |
+| PyCharm | `pycharm` |
+| Rider | `rider` |
+| RubyMine | `rubymine` |
+| RustRover | `rustrover` |
+| WebStorm | `webstorm` |
+| DataSpell | `dataspell` |
+
+Start the workspace with the desired IDE:
+
+```bash
+devpod up my-workspace --ide goland
+```
+
+DevPod installs the IDE server inside the workspace and opens JetBrains Gateway. When the Gateway SSH dialog appears, click **Check Connection and Continue** to launch the IDE.
+
+To target a specific IDE version:
+
+```bash
+devpod up my-workspace --ide goland --ide-option VERSION=2022.3.3
+```
+
+<Info>
+  If JetBrains Gateway fails to connect, you can also connect manually using the SSH host `my-workspace.devpod`.
+</Info>
+
+## Connect via SSH
+
+DevPod writes an SSH config entry for every workspace, so you can connect with the standard `ssh` command:
+
+```bash
+ssh my-workspace.devpod
+```
+
+This also allows any IDE or tool that supports remote development over SSH to connect by using `my-workspace.devpod` as the host.
+
+## Connect with the DevPod CLI
+
+If you cannot use `ssh` directly, use the `devpod ssh` command:
+
+```bash
+devpod ssh my-workspace
+```
+
+### Run a one-off command
+
+```bash
+devpod ssh my-workspace --command "echo Hello World"
+```
+
+### Key flags for `devpod ssh`
+
+| Flag | Default | Description |
+|---|---|---|
+| `--command <cmd>` | — | Run a command and exit instead of opening an interactive shell |
+| `--user <user>` | — | Connect as a specific user |
+| `--agent-forwarding` | `true` | Forward local SSH keys to the workspace |
+| `--gpg-agent-forwarding` | `false` | Forward local GPG agent to the workspace |
+| `--forward-ports` / `-L` | — | Forward a local port to a port in the workspace |
+| `--reverse-forward-ports` / `-R` | — | Reverse-forward a port from the workspace to a local port |
+| `--workdir <path>` | — | Set the working directory inside the container |
+
+## Manage IDE settings
+
+### List available options for an IDE
+
+```bash
+devpod ide options openvscode
+```
+
+### Set an IDE option globally
+
+```bash
+devpod ide set-options openvscode -o VERSION=v1.76.2
+```
+
+### Change the default IDE
+
+```bash
+devpod ide use vscode
+```
+
+### List all supported IDEs
+
+```bash
+devpod ide list
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Stop or delete a workspace" icon="square" href="/workspaces/stop-delete-workspace">
+    Pause a workspace or remove it entirely to free up resources.
+  </Card>
+  <Card title="Credentials" icon="key" href="/workspaces/credentials">
+    Learn how DevPod injects Git, Docker, and GPG credentials automatically.
+  </Card>
+</CardGroup>

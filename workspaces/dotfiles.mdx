@@ -1,0 +1,85 @@
+---
+title: "Use dotfiles in DevPod workspaces for personalization"
+description: "DevPod can clone your dotfiles repository into every workspace and run your install script automatically. Configure dotfiles per workspace or globally for all workspaces."
+---
+
+Dotfiles are plain-text configuration files — shell settings, editor preferences, aliases, and tools — that define your personal development environment. DevPod can clone your dotfiles repository into every workspace and run your install script automatically, so your environment feels familiar regardless of which project or provider you are working with.
+
+## How it works
+
+When you pass `--dotfiles` to `devpod up`, DevPod clones the specified repository into the workspace after the container is created. It then looks for a setup script to run in the following locations, in order:
+
+- `install.sh`
+- `install`
+- `bootstrap.sh`
+- `bootstrap`
+- `script/bootstrap`
+- `setup.sh`
+- `setup`
+- `script/setup`
+
+If none of these scripts are found, DevPod falls back to symlinking every hidden file (files starting with `.`) from the dotfiles repository into the container's `$HOME` directory.
+
+## Install dotfiles in a single workspace
+
+Pass the `--dotfiles` flag when creating or starting a workspace:
+
+```bash
+devpod up https://github.com/example/repo \
+  --dotfiles https://github.com/my-user/my-dotfiles-repo
+```
+
+### Use a custom install script
+
+If your install script is not in one of the standard locations, specify its path within the dotfiles repository:
+
+```bash
+devpod up https://github.com/example/repo \
+  --dotfiles https://github.com/my-user/my-dotfiles-repo \
+  --dotfiles-script custom/location/install.sh
+```
+
+### Pass environment variables to the install script
+
+You can inject environment variables into the dotfiles install script with `--dotfiles-script-env`:
+
+```bash
+devpod up https://github.com/example/repo \
+  --dotfiles https://github.com/my-user/my-dotfiles-repo \
+  --dotfiles-script-env MY_VAR=my-value
+```
+
+To load variables from a file, use `--dotfiles-script-env-file`:
+
+```bash
+devpod up https://github.com/example/repo \
+  --dotfiles https://github.com/my-user/my-dotfiles-repo \
+  --dotfiles-script-env-file /path/to/env-file
+```
+
+## Apply dotfiles to all workspaces
+
+Instead of passing `--dotfiles` every time, configure the dotfiles URL at the context level so it applies to every new workspace:
+
+```bash
+devpod context set-options \
+  -o DOTFILES_URL=https://github.com/my-user/my-dotfiles-repo \
+  -o DOTFILES_SCRIPT=bin/.local/bin/dotfiles
+```
+
+All workspaces created after this change will use the configured dotfiles repository and install script automatically.
+
+<Tip>
+  Setting dotfiles at the context level is the recommended approach for teams where every developer has their own dotfiles repository. Each developer sets their own context option locally, and DevPod handles the rest on every `devpod up`.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Create a workspace" icon="plus" href="/workspaces/create-workspace">
+    See all flags available for `devpod up`, including `--dotfiles`.
+  </Card>
+  <Card title="Credentials" icon="key" href="/workspaces/credentials">
+    Learn how DevPod injects Git and Docker credentials automatically.
+  </Card>
+</CardGroup>

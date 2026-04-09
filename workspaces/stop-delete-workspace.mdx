@@ -1,0 +1,116 @@
+---
+title: "Stop, delete, and check status of DevPod workspaces"
+description: "Stop a workspace to pause it and save costs, or delete it to remove all state. Covers devpod stop, devpod delete, devpod list, devpod status, and inactivity timeout."
+---
+
+DevPod gives you full control over the lifecycle of your workspaces. You can stop a workspace to temporarily pause it without losing data, delete it to remove all state entirely, or let DevPod shut it down automatically after an inactivity period.
+
+## Stop a workspace
+
+Stopping a workspace pauses the container so it no longer consumes CPU or memory. Depending on the provider, this either stops the Docker container or shuts down the underlying virtual machine. Your project files and container state are preserved and restored when you restart.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    devpod stop my-workspace
+    ```
+
+    To restart a stopped workspace:
+
+    ```bash
+    devpod up my-workspace
+    ```
+  </Tab>
+  <Tab title="Desktop app">
+    In the **Workspaces** view, click **More Options** on the workspace you want to pause, then click **Stop**. To restart it later, click the **Open** button.
+  </Tab>
+</Tabs>
+
+## Delete a workspace
+
+Deleting a workspace removes all container state and erases the workspace entry from DevPod. Depending on the provider, this may also delete the underlying virtual machine.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    devpod delete my-workspace
+    ```
+
+    If the provider is unreachable or deletion fails, you can force a local-only deletion:
+
+    ```bash
+    devpod delete my-workspace --force
+    ```
+  </Tab>
+  <Tab title="Desktop app">
+    In the **Workspaces** view, click **More Options** on the workspace, then click **Delete**. To force-delete a workspace whose provider is no longer reachable, check the **Force** checkbox before confirming.
+  </Tab>
+</Tabs>
+
+<Warning>
+  Force deletion removes the workspace record from DevPod locally but ignores errors from the provider. Any cloud resources (VMs, volumes) that the provider created may not be cleaned up. Use this only when the provider is genuinely unreachable.
+</Warning>
+
+## List workspaces
+
+To see all workspaces managed by DevPod:
+
+```bash
+devpod list
+```
+
+The output includes the workspace name, source, machine, provider, IDE, last-used time, and age. Use `--output json` for machine-readable output:
+
+```bash
+devpod list --output json
+```
+
+## Check workspace status
+
+To inspect the current status of a specific workspace:
+
+```bash
+devpod status my-workspace
+```
+
+Possible states are `Running`, `Stopped`, `Busy`, and `NotFound`. Use `--output json` for structured output:
+
+```bash
+devpod status my-workspace --output json
+```
+
+The JSON output includes the workspace ID, context, provider, and state.
+
+## Automatic inactivity timeout
+
+Most providers automatically stop idle workspaces to save costs. DevPod monitors activity inside the container and triggers a shutdown after no connections have been detected for a configurable duration.
+
+<AccordionGroup>
+  <Accordion title="How it works for non-machine providers">
+    For providers such as Docker, Kubernetes, and SSH, DevPod runs a process inside the container that tracks activity. When the configured inactivity period expires, DevPod terminates the container process. The container data is preserved — when you reconnect, DevPod restarts the container automatically.
+  </Accordion>
+  <Accordion title="How it works for machine providers">
+    For cloud providers (AWS, GCP, Azure, and others), stopping just the container is not enough because the underlying VM continues to incur costs. DevPod installs itself as a daemon on the remote VM and shuts down or deletes the machine when it has been idle for the configured period. When you reconnect, DevPod restarts or recreates the VM.
+  </Accordion>
+</AccordionGroup>
+
+<Info>
+  All official DevPod providers come pre-configured with a 5–10 minute inactivity timeout. To change it, update the `INACTIVITY_TIMEOUT` option in the provider settings. See your provider's documentation for the exact option name.
+</Info>
+
+To configure the timeout, set the provider option when adding or updating the provider:
+
+```bash
+devpod provider update docker -o INACTIVITY_TIMEOUT=10m
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Create a workspace" icon="plus" href="/workspaces/create-workspace">
+    Create workspaces from Git repos, local folders, or Docker images.
+  </Card>
+  <Card title="Connect to a workspace" icon="terminal" href="/workspaces/connect-to-workspace">
+    Open your workspace in VS Code, JetBrains, or via SSH.
+  </Card>
+</CardGroup>

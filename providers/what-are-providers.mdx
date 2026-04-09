@@ -1,0 +1,96 @@
+---
+title: "What are DevPod providers? Docker, Kubernetes, and cloud VMs"
+description: "Providers are plugins that tell DevPod how to create and manage developer environments — from local Docker containers to cloud VMs on AWS, GCP, Azure, and more."
+---
+
+Providers are the backbone of DevPod's flexibility. Each provider is a plugin that tells DevPod how to create, connect to, and manage a workspace — whether that means spinning up a local Docker container, scheduling a Kubernetes pod, or provisioning a virtual machine in a cloud provider. Providers are defined by a `provider.yaml` manifest that specifies the options, binaries, and commands DevPod needs to manage the full workspace lifecycle.
+
+## Provider types
+
+There are two distinct categories of providers depending on how they handle the underlying compute.
+
+<CardGroup cols={2}>
+  <Card title="Non-machine providers" icon="container">
+    Work directly with containers rather than VMs. DevPod runs the workspace container on the target without creating or managing any virtual machine. Examples include the Docker, Kubernetes, and SSH providers.
+  </Card>
+  <Card title="Machine providers" icon="server">
+    Create and manage a full virtual machine for each workspace. DevPod handles the complete VM lifecycle — provisioning, starting, stopping, and deleting. Examples include AWS (EC2), GCP, Azure, and DigitalOcean.
+  </Card>
+</CardGroup>
+
+## Built-in providers
+
+DevPod ships with three providers that are available without any additional installation:
+
+| Provider | Type | Description |
+| --- | --- | --- |
+| `docker` | Non-machine | Runs workspace containers using a local or remote Docker daemon |
+| `kubernetes` | Non-machine | Schedules workspace pods on any Kubernetes cluster |
+| `pro` | — | Connects to a DevPod Pro or Loft instance |
+
+## Community providers
+
+The DevPod ecosystem includes a growing set of community-maintained providers for popular cloud platforms. These can be installed directly from GitHub using `devpod provider add`.
+
+<CardGroup cols={2}>
+  <Card title="devpod-provider-aws" icon="cloud" href="https://github.com/loft-sh/devpod-provider-aws">
+    Amazon Web Services — provisions EC2 instances for each workspace.
+  </Card>
+  <Card title="devpod-provider-gcp" icon="cloud" href="https://github.com/loft-sh/devpod-provider-gcloud">
+    Google Cloud Platform — creates Compute Engine VMs.
+  </Card>
+  <Card title="devpod-provider-azure" icon="cloud" href="https://github.com/loft-sh/devpod-provider-azure">
+    Microsoft Azure — provisions Azure virtual machines.
+  </Card>
+  <Card title="devpod-provider-digitalocean" icon="cloud" href="https://github.com/loft-sh/devpod-provider-digitalocean">
+    DigitalOcean — creates Droplets for workspace environments.
+  </Card>
+  <Card title="devpod-provider-ssh" icon="terminal" href="https://github.com/loft-sh/devpod-provider-ssh">
+    Connect to any machine reachable over SSH — no VM provisioning required.
+  </Card>
+  <Card title="devpod-provider-hetzner" icon="cloud" href="https://github.com/mrsimonemms/devpod-provider-hetzner">
+    Hetzner Cloud — cost-effective cloud VMs based in Europe.
+  </Card>
+  <Card title="devpod-provider-civo" icon="cloud" href="https://github.com/dirien/devpod-provider-scaleway">
+    Civo Cloud — fast Kubernetes-native cloud infrastructure.
+  </Card>
+  <Card title="More on GitHub" icon="github" href="https://github.com/search?q=devpod-provider&type=repositories">
+    Search GitHub for `devpod-provider-*` to discover additional community providers.
+  </Card>
+</CardGroup>
+
+## The provider.yaml manifest
+
+Every provider — built-in or community — is defined by a `provider.yaml` file. This manifest declares the provider's name, version, configurable options, and the shell commands DevPod must run to manage the workspace.
+
+```yaml
+name: docker
+version: v0.0.1
+description: DevPod on Docker
+options:
+  DOCKER_PATH:
+    description: The path where to find the docker binary.
+    default: docker
+  DOCKER_HOST:
+    description: The docker host to use.
+  INACTIVITY_TIMEOUT:
+    description: "Automatically stop the container after the inactivity period. Examples: 10m, 1h"
+  DOCKER_BUILDER:
+    description: The docker builder to use.
+exec:
+  command: |-
+    "${DEVPOD}" helper sh -c "${COMMAND}"
+```
+
+Options declared in `provider.yaml` are presented to you when you run `devpod provider add`, and can be reconfigured at any time using `devpod provider use` or `devpod provider set-options`.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Add a provider" icon="plus" href="/providers/add-provider">
+    Install built-in, GitHub, or custom providers and configure their options.
+  </Card>
+  <Card title="Manage providers" icon="sliders" href="/providers/manage-providers">
+    List, update, delete, and set a default provider.
+  </Card>
+</CardGroup>

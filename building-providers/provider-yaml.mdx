@@ -1,0 +1,368 @@
+---
+title: "provider.yaml schema reference for DevPod providers"
+description: "Full provider.yaml schema: name, version, options, exec commands, agent, and binaries sections. Includes examples from the Docker and Kubernetes built-in providers."
+---
+
+The `provider.yaml` manifest is the single file that describes a DevPod provider. DevPod reads this file to understand how to interact with a provider: what options the user must supply, what commands to run to manage workspaces, and how to configure the in-environment agent. This page documents every field available in the manifest.
+
+<Tip>
+If you are new to building providers, start with the [quickstart guide](/building-providers/quickstart) to see how the pieces fit together before diving into the full schema.
+</Tip>
+
+## Top-level fields
+
+```yaml
+name: my-provider      # Required
+version: v0.0.1        # Required
+description: |-        # Optional
+  A short description shown in the UI
+icon: https://example.com/icon.svg  # Optional, shown in Desktop App
+home: https://github.com/my-org/my-provider  # Optional, link to provider repo
+```
+
+<ParamField path="name" type="string" required>
+  The unique identifier for the provider. Used in CLI commands such as `devpod provider add` and `devpod up --provider`. Must be lowercase and contain only letters, numbers, and hyphens.
+</ParamField>
+
+<ParamField path="version" type="string" required>
+  The version of the provider, e.g. `v0.0.1`. Used for display and update checks.
+</ParamField>
+
+<ParamField path="description" type="string">
+  A short human-readable description of the provider. Displayed in the Desktop App and via `devpod provider list`.
+</ParamField>
+
+<ParamField path="icon" type="string">
+  URL to an icon image. Displayed in the Desktop App next to the provider name.
+</ParamField>
+
+<ParamField path="home" type="string">
+  URL to the provider's home page or repository. Displayed as a link in the Desktop App.
+</ParamField>
+
+## options
+
+The `options` section defines user-configurable settings. Each key becomes an environment variable available in all `exec` scripts. See the [Options reference](/building-providers/options) for full details.
+
+```yaml
+options:
+  AGENT_PATH:
+    description: The path where to inject the DevPod agent.
+    default: /opt/devpod/agent
+  INSTANCE_TYPE:
+    description: The VM instance type to create.
+    default: t3.medium
+    required: true
+  API_KEY:
+    description: Your cloud API key.
+    required: true
+    password: true
+```
+
+<ParamField path="options.<KEY>" type="object">
+  An option definition. The key name (e.g. `AGENT_PATH`) is the environment variable name that will be set when exec scripts run.
+
+  <Expandable title="Option fields">
+    <ParamField path="options.<KEY>.description" type="string">
+      Human-readable description shown in `devpod provider options` and in the Desktop App.
+    </ParamField>
+    <ParamField path="options.<KEY>.default" type="string">
+      Default value. Can reference other options using `${OTHER_OPTION}`.
+    </ParamField>
+    <ParamField path="options.<KEY>.required" type="boolean" default="false">
+      If `true`, DevPod prompts the user for a value if none is set.
+    </ParamField>
+    <ParamField path="options.<KEY>.password" type="boolean" default="false">
+      If `true`, the value is masked in the CLI and Desktop App.
+    </ParamField>
+    <ParamField path="options.<KEY>.global" type="boolean">
+      If `true`, the option value is shared across all workspaces using this provider.
+    </ParamField>
+    <ParamField path="options.<KEY>.local" type="boolean">
+      If `true`, the option is set individually for each workspace or machine.
+    </ParamField>
+    <ParamField path="options.<KEY>.hidden" type="boolean" default="false">
+      If `true`, the option is not shown in the UI or CLI. Useful for storing computed tokens.
+    </ParamField>
+    <ParamField path="options.<KEY>.type" type="string" default="string">
+      The option's data type. One of `string`, `number`, `boolean`, `duration`, or `multiline`.
+    </ParamField>
+    <ParamField path="options.<KEY>.enum" type="string[]">
+      A list of allowed values. DevPod will reject any value not in this list.
+    </ParamField>
+    <ParamField path="options.<KEY>.suggestions" type="string[]">
+      A list of suggested values shown as autocomplete in the Desktop App. Does not restrict input.
+    </ParamField>
+    <ParamField path="options.<KEY>.command" type="string">
+      A shell command whose stdout becomes the option's value. Useful for forwarding environment variables from the local machine or calling a helper binary to retrieve tokens.
+    </ParamField>
+    <ParamField path="options.<KEY>.cache" type="string">
+      Duration after which DevPod re-runs the `command` to refresh the value. Example: `5m`, `1h`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## optionGroups
+
+Organizes options into collapsible groups in the Desktop App. This has no effect on the CLI.
+
+```yaml
+optionGroups:
+  - options:
+      - INSTANCE_TYPE
+      - DISK_SIZE
+      - REGION
+    name: "Instance options"
+    defaultVisible: true
+  - options:
+      - AGENT_PATH
+      - INJECT_GIT_CREDENTIALS
+    name: "Agent options"
+    defaultVisible: false
+```
+
+<ParamField path="optionGroups[].name" type="string" required>
+  Display name for the option group.
+</ParamField>
+
+<ParamField path="optionGroups[].options" type="string[]" required>
+  List of option keys to include in this group.
+</ParamField>
+
+<ParamField path="optionGroups[].defaultVisible" type="boolean" default="false">
+  If `true`, the group is expanded by default in the Desktop App.
+</ParamField>
+
+## exec
+
+The `exec` section defines the shell scripts DevPod runs to interact with the provider environment. All scripts are POSIX shell. On Windows, DevPod uses an emulated POSIX shell.
+
+All option values and built-in variables (`${DEVPOD}`, `${COMMAND}`, `${AGENT_PATH}`) are available as environment variables in every script.
+
+```yaml
+exec:
+  command: |-    # Required
+    sh -c "${COMMAND}"
+  init: |-       # Optional
+    check-prerequisites
+  create: |-     # Optional — presence marks this as a machine provider
+    ${MY_BINARY} create
+  delete: |-     # Optional
+    ${MY_BINARY} delete
+  start: |-      # Optional
+    ${MY_BINARY} start
+  stop: |-       # Optional
+    ${MY_BINARY} stop
+  status: |-     # Optional
+    ${MY_BINARY} status
+```
+
+<ParamField path="exec.command" type="string" required>
+  Defines how to run a command inside the target environment. DevPod substitutes `${COMMAND}` at runtime. All communication between DevPod and the workspace flows through this command's stdin and stdout.
+
+  Example for a local Docker-based provider:
+  ```yaml
+  exec:
+    command: |-
+      "${DEVPOD}" helper sh -c "${COMMAND}"
+  ```
+</ParamField>
+
+<ParamField path="exec.init" type="string">
+  Runs when the provider is first added or when options are updated. Use it to validate configuration, check that dependencies are installed, and authenticate with remote services.
+</ParamField>
+
+<ParamField path="exec.create" type="string">
+  Provisions a new machine. Defining this field makes the provider a **machine provider**. DevPod will also expect `exec.delete` to be defined.
+</ParamField>
+
+<ParamField path="exec.delete" type="string">
+  Destroys a machine previously created by `exec.create`. Required when `exec.create` is defined.
+</ParamField>
+
+<ParamField path="exec.start" type="string">
+  Starts a stopped machine. Only valid for machine providers.
+</ParamField>
+
+<ParamField path="exec.stop" type="string">
+  Stops a running machine without destroying it. Only valid for machine providers.
+</ParamField>
+
+<ParamField path="exec.status" type="string">
+  Returns the current state of a machine on stdout. DevPod expects one of: `Running`, `Busy`, `Stopped`, or `NotFound`.
+
+  | Value | Meaning |
+  |-------|---------|
+  | `Running` | Machine is running and ready to accept connections |
+  | `Busy` | Machine is transitioning (starting, stopping, or being terminated) |
+  | `Stopped` | Machine exists but is not running |
+  | `NotFound` | Machine does not exist |
+</ParamField>
+
+### Machine vs non-machine providers
+
+The presence of `exec.create` is the sole signal that determines whether a provider is a machine provider.
+
+| Provider type | Required exec commands | Optional exec commands |
+|---------------|------------------------|------------------------|
+| Non-machine | `command` | `init` |
+| Machine | `command`, `create`, `delete` | `init`, `start`, `stop`, `status` |
+
+## agent
+
+Configures the DevPod agent that is injected into the target environment. See the [Agent reference](/building-providers/agent) for full details.
+
+```yaml
+agent:
+  path: ${AGENT_PATH}
+  driver: docker             # Optional, default: docker
+  local: false               # Set true for providers running containers locally
+  inactivityTimeout: 10m
+  containerInactivityTimeout: 10m
+  injectGitCredentials: "true"
+  injectDockerCredentials: "true"
+  docker:
+    path: /usr/bin/docker
+    install: true
+  exec:
+    shutdown: |-
+      ${MY_BINARY} stop
+  binaries:
+    MY_BINARY:
+      - os: linux
+        arch: amd64
+        path: https://example.com/binary-linux-amd64
+        checksum: abc123
+```
+
+<ParamField path="agent.path" type="string">
+  Where to place the DevPod agent binary on the remote machine. Use `${DEVPOD}` to reuse the local binary for providers that run locally (such as docker or kubernetes with `local: true`).
+</ParamField>
+
+<ParamField path="agent.driver" type="string" default="docker">
+  The container runtime driver. Supported values: `docker`, `kubernetes`.
+</ParamField>
+
+<ParamField path="agent.local" type="boolean" default="false">
+  Set to `true` for providers that run containers on the local machine (e.g., docker, kubernetes). This tells DevPod to treat the local machine as the target environment.
+</ParamField>
+
+<ParamField path="agent.inactivityTimeout" type="string">
+  How long to wait before shutting down an idle machine. Used for machine providers. Example: `10m`, `1h`. Triggers `agent.exec.shutdown`.
+</ParamField>
+
+<ParamField path="agent.containerInactivityTimeout" type="string">
+  How long to wait before stopping an idle container. Used for non-machine providers. Example: `10m`. DevPod kills the container process with pid 1.
+</ParamField>
+
+<ParamField path="agent.injectGitCredentials" type="string">
+  Whether to forward local git credentials into the workspace. Accepts `"true"` or `"false"`, or an option reference such as `${INJECT_GIT_CREDENTIALS}`.
+</ParamField>
+
+<ParamField path="agent.injectDockerCredentials" type="string">
+  Whether to forward local Docker registry credentials into the workspace.
+</ParamField>
+
+<ParamField path="agent.exec.shutdown" type="string">
+  Shell script to run when `inactivityTimeout` is reached. All option values are available. Use this to call a cloud API to stop or delete the machine.
+</ParamField>
+
+<ParamField path="agent.binaries" type="object">
+  Additional binaries to download and install on the remote machine. Follows the same structure as the top-level [`binaries`](/building-providers/binaries) section. Binaries declared here are available in `agent.exec.shutdown`.
+</ParamField>
+
+## binaries
+
+Specifies platform-specific helper binaries DevPod should download when the provider is added. Each binary name becomes an environment variable in all exec scripts. See the [Binaries reference](/building-providers/binaries) for full details.
+
+```yaml
+binaries:
+  MY_BINARY:
+    - os: linux
+      arch: amd64
+      path: https://github.com/my-org/my-binary/releases/download/v1.0.0/binary-linux-amd64
+      checksum: abc123def456
+    - os: darwin
+      arch: arm64
+      path: https://github.com/my-org/my-binary/releases/download/v1.0.0/binary-darwin-arm64
+      checksum: 789xyz
+    - os: windows
+      arch: amd64
+      path: https://github.com/my-org/my-binary/releases/download/v1.0.0/binary-windows-amd64.exe
+      checksum: 456uvw
+```
+
+## Complete example: docker provider
+
+The official DevPod Docker provider is one of the simplest real-world examples:
+
+```yaml
+name: docker
+version: v0.0.1
+icon: https://devpod.sh/assets/docker.svg
+home: https://github.com/loft-sh/devpod
+description: |-
+  DevPod on Docker
+optionGroups:
+  - options:
+      - DOCKER_PATH
+      - DOCKER_HOST
+      - INACTIVITY_TIMEOUT
+      - DOCKER_BUILDER
+    name: "Advanced Options"
+options:
+  INACTIVITY_TIMEOUT:
+    description: "If defined, will automatically stop the container after the inactivity period. Examples: 10m, 1h"
+  DOCKER_PATH:
+    description: The path where to find the docker binary.
+    default: docker
+  DOCKER_HOST:
+    global: true
+    description: The docker host to use.
+  DOCKER_BUILDER:
+    global: true
+    description: The docker builder to use.
+agent:
+  containerInactivityTimeout: ${INACTIVITY_TIMEOUT}
+  local: true
+  docker:
+    path: ${DOCKER_PATH}
+    builder: ${DOCKER_BUILDER}
+    install: false
+    env:
+      DOCKER_HOST: ${DOCKER_HOST}
+exec:
+  command: |-
+    "${DEVPOD}" helper sh -c "${COMMAND}"
+```
+
+## Complete example: kubernetes provider (abbreviated)
+
+```yaml
+name: kubernetes
+version: v0.0.1
+icon: https://devpod.sh/assets/kubernetes.svg
+description: |-
+  DevPod on Kubernetes
+options:
+  KUBERNETES_NAMESPACE:
+    description: The kubernetes namespace to use. Defaults to devpod.
+    default: "devpod"
+  DISK_SIZE:
+    description: The default size for the persistent volume to use.
+    default: 10Gi
+    global: true
+  INACTIVITY_TIMEOUT:
+    description: "If defined, will automatically stop the pod after the inactivity period. Examples: 10m, 1h"
+agent:
+  containerInactivityTimeout: ${INACTIVITY_TIMEOUT}
+  local: true
+  driver: kubernetes
+  kubernetes:
+    kubernetesNamespace: ${KUBERNETES_NAMESPACE}
+    diskSize: ${DISK_SIZE}
+    createNamespace: true
+exec:
+  command: |-
+    "${DEVPOD}" helper sh -c "${COMMAND}"
+```

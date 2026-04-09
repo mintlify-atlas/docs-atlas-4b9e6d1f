@@ -1,0 +1,301 @@
+---
+title: "Troubleshoot DevPod workspace and provider errors"
+description: Diagnose and fix common DevPod issues including workspace startup failures, SSH connection errors, IDE problems, provider errors, and platform-specific quirks.
+---
+
+This page covers the most common issues encountered when using DevPod and their solutions. For issues not listed here, collect troubleshooting information with `devpod troubleshoot` and open a GitHub issue or ask in the community Slack.
+
+## Collecting troubleshooting information
+
+Run the following command to produce a JSON report containing your CLI version, full config, all configured providers, workspace state, and daemon status:
+
+```bash
+devpod troubleshoot [workspace-name]
+```
+
+Include the output when reporting bugs. It contains no credentials or secrets — only structural configuration and status information.
+
+## Enabling debug logging
+
+Add `--debug` to any command to print stack traces and verbose log output:
+
+```bash
+devpod up my-workspace --debug
+devpod ssh my-workspace --debug
+```
+
+You can also set the environment variable before running any DevPod command:
+
+```bash
+DEVPOD_DEBUG=true devpod up my-workspace
+```
+
+To change the log format to JSON (useful for log aggregation):
+
+```bash
+devpod up my-workspace --log-output json
+```
+
+## Common issues
+
+<AccordionGroup>
+
+<Accordion title="Workspace won't start">
+
+**Symptoms:** `devpod up` hangs or exits with an error immediately.
+
+**Steps to resolve:**
+
+1. Confirm your provider is configured correctly:
+   ```bash
+   devpod provider list
+   devpod provider options <provider-name>
+   ```
+2. For the Docker provider, verify Docker is running:
+   ```bash
+   docker info
+   ```
+3. Run with `--debug` to see the full error:
+   ```bash
+   devpod up my-workspace --debug
+   ```
+4. If the workspace is in a broken state, try recreating it:
+   ```bash
+   devpod up my-workspace --recreate
+   ```
+5. For a full reset (removes sources too):
+   ```bash
+   devpod up my-workspace --reset
+   ```
+
+</Accordion>
+
+<Accordion title="SSH connection fails">
+
+**Symptoms:** `devpod ssh` exits with a connection error, or the IDE cannot connect.
+
+**Steps to resolve:**
+
+1. Check the workspace is running:
+   ```bash
+   devpod status my-workspace
+   ```
+   If it is stopped, restart it:
+   ```bash
+   devpod up my-workspace
+   ```
+2. Run with `--debug` to see SSH-level errors:
+   ```bash
+   devpod ssh my-workspace --debug
+   ```
+3. Inspect the generated SSH config entry:
+   ```bash
+   cat ~/.ssh/config
+   ```
+   Regenerate it by running `devpod up my-workspace` again.
+4. If SSH strict host key checking causes failures, disable it for the context:
+   ```bash
+   devpod context set-options -o SSH_STRICT_HOST_KEY_CHECKING=false
+   ```
+
+</Accordion>
+
+<Accordion title="IDE won't open or connect">
+
+**Symptoms:** `devpod up` completes but the IDE never opens, or opens with a connection error.
+
+**Steps to resolve:**
+
+1. Verify the IDE is installed locally and accessible in `PATH`. For JetBrains IDEs, confirm JetBrains Gateway is installed.
+2. Try opening the IDE manually using the SSH alias that DevPod configured:
+   ```bash
+   # VS Code
+   code --remote ssh-remote+my-workspace.devpod /workspaces/my-workspace
+
+   # Or open SSH directly
+   devpod ssh my-workspace
+   ```
+3. Re-run `devpod up` with `--open-ide=false` to start the workspace without launching the IDE, then open it manually:
+   ```bash
+   devpod up my-workspace --open-ide=false
+   ```
+4. Check that DevPod utilities are available in `PATH`. On macOS, if the Desktop app reports utilities missing, wrap the invocation in a shell script:
+   ```bash
+   #!/usr/bin/env sh
+   exec $SHELL -c 'exec /Applications/DevPod.app/Contents/MacOS/DevPod'
+   ```
+
+</Accordion>
+
+<Accordion title="Port forwarding not working">
+
+**Symptoms:** Ports defined in `devcontainer.json` or `docker-compose.yml` are not accessible on localhost.
+
+**Steps to resolve:**
+
+DevPod relies on an active SSH session to forward ports to the local host.
+
+- If you are using `--ide none`, you must keep an SSH session open:
+  ```bash
+  devpod ssh my-workspace
+  ```
+- To forward a specific port explicitly:
+  ```bash
+  devpod ssh my-workspace -L 8080:localhost:8080
+  ```
+- If using Docker Compose with `--ide none`, ports specified in Compose are forwarded automatically when an SSH session is active.
+
+</Accordion>
+
+<Accordion title="Provider errors — credentials or configuration">
+
+**Symptoms:** Provider-specific errors about authentication, permissions, or missing options.
+
+**Steps to resolve:**
+
+1. Review the required options for your provider:
+   ```bash
+   devpod provider options <provider-name>
+   ```
+2. Update credentials or options:
+   ```bash
+   devpod provider set-options <provider-name> -o KEY=VALUE
+   ```
+3. For cloud providers, ensure your local CLI tool (e.g. `aws`, `gcloud`, `az`) is authenticated and the credentials are accessible to DevPod.
+4. Run `devpod up --debug` and look for authentication errors in the output.
+
+</Accordion>
+
+<Accordion title="Workspace stopped after sleep / can't reconnect">
+
+**Symptoms:** The workspace was working before but now shows as stopped. The IDE can no longer connect.
+
+**Steps to resolve:**
+
+The inactivity daemon may have stopped the workspace after a period of no activity. Restart it with:
+
+```bash
+devpod up my-workspace
+```
+
+This resumes the workspace and reconnects the IDE without recreating the container.
+
+</Accordion>
+
+<Accordion title="devcontainer.json errors">
+
+**Symptoms:** DevPod exits with a parse or validation error referencing `devcontainer.json`.
+
+**Steps to resolve:**
+
+1. Validate the JSON syntax — JSON does not permit trailing commas or comments:
+   ```bash
+   cat .devcontainer/devcontainer.json | python3 -m json.tool
+   ```
+2. Check that required fields are present. The minimum valid `devcontainer.json` is:
+   ```json
+   {
+     "image": "mcr.microsoft.com/devcontainers/base:ubuntu"
+   }
+   ```
+3. If `devcontainer.json` is not in the default location (`.devcontainer/devcontainer.json` or `.devcontainer.json`), specify its path:
+   ```bash
+   devpod up my-workspace --devcontainer-path .devcontainer/custom.json
+   ```
+
+</Accordion>
+
+<Accordion title="Linux: file permission issues with local directories">
+
+When starting a workspace from a local directory with a `remoteUser` set in `devcontainer.json`, DevPod changes ownership of the directory to the container user. After the workspace stops, the files appear to be owned by an unknown user on the host.
+
+To restore permissions:
+
+```bash
+sudo chown -R $USER:$GROUP .
+```
+
+For ongoing work, push the project to a Git repository and use the Git URL with `devpod up` instead of a local path.
+
+</Accordion>
+
+<Accordion title="Linux: ENAMETOOLONG error when opening in VS Code">
+
+Some Linux distributions put a large number of entries in `PATH`, causing the SSH connection string to exceed the maximum path length.
+
+The workaround is to specify the SSH binary path explicitly in VS Code settings:
+
+```json
+{
+  "remote.SSH.path": "/usr/bin/ssh"
+}
+```
+
+See [GitHub issue #1045](https://github.com/loft-sh/devpod/issues/1045) for details.
+
+</Accordion>
+
+<Accordion title="Linux: SELinux permission denied with mounted volumes">
+
+If you are running SELinux and see "Permission Denied" errors even though file ownership is correct, append `:Z` to your volume definitions in `devcontainer.json`:
+
+```json
+{
+  "workspaceMount": "",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "runArgs": [
+    "--volume=${localWorkspaceFolder}:/workspaces/${localWorkspaceFolderBasename}:Z"
+  ]
+}
+```
+
+</Accordion>
+
+<Accordion title="Linux: Fish shell interfering with workspace setup">
+
+Custom configurations in `config.fish` run for every `fish -c` invocation, including those made by the DevPod agent. This can interfere with workspace initialization.
+
+Move customizations inside the `if status is-interactive` block:
+
+```fish
+if status is-interactive
+    # Commands to run in interactive sessions only
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+    # other customizations
+end
+```
+
+</Accordion>
+
+<Accordion title="Windows: line 2: $'\r': command not found">
+
+This error is caused by Windows line endings (CRLF) in shell scripts. Add the following to `.gitattributes` in the repository:
+
+```
+*.sh eol=lf
+```
+
+</Accordion>
+
+</AccordionGroup>
+
+## Telemetry
+
+DevPod collects anonymous usage telemetry to help prioritize features and bug fixes. No personally identifiable information is collected — only command names, provider type, IDE used, CLI version, OS, and errors.
+
+To opt out for a context:
+
+```bash
+devpod context set-options -o TELEMETRY=false
+```
+
+To opt out globally via environment variable:
+
+```bash
+export DEVPOD_DISABLE_TELEMETRY=true
+```
+
+## Getting help
+
+- **GitHub Issues:** [github.com/loft-sh/devpod/issues](https://github.com/loft-sh/devpod/issues) — Search for existing reports before opening a new one. Attach the output of `devpod troubleshoot` when filing a bug.
+- **Slack Community:** Join the Loft community Slack and use the `#devpod` channel for questions and discussion.

@@ -1,0 +1,152 @@
+---
+title: "Quickstart: your first DevPod workspace in minutes"
+description: "Create a reproducible dev environment with DevPod and Docker in minutes. Add a provider, run devpod up, and open your project directly in your IDE."
+---
+
+This guide walks you through creating your first DevPod workspace using the Docker provider — the most common path for local development. You will add Docker as a provider, start a workspace from a public Git repository, and have your IDE open automatically inside the running container.
+
+<Note>
+  Make sure you have [DevPod installed](/getting-started/install) and [Docker](https://docs.docker.com/get-docker/) running on your machine before continuing.
+</Note>
+
+<Tabs>
+  <Tab title="CLI">
+    <Steps>
+      <Step title="Add the Docker provider">
+        DevPod needs at least one provider before it can create workspaces. Add the built-in Docker provider:
+
+        ```bash
+        devpod provider add docker
+        ```
+
+        DevPod will detect your local Docker installation automatically. You can verify it was added:
+
+        ```bash
+        devpod provider list
+        ```
+      </Step>
+
+      <Step title="Start a workspace">
+        Point `devpod up` at any Git repository. DevPod reads the `devcontainer.json` in the repo and builds the environment. Pass `--ide` to choose which IDE opens automatically.
+
+        ```bash
+        devpod up github.com/microsoft/vscode-remote-try-go --ide vscode
+        ```
+
+        DevPod will pull the container image, create the workspace, configure SSH access, and launch VS Code connected to the running container.
+
+        <Tip>
+          If the repository has no `devcontainer.json`, DevPod uses a sensible fallback image so the workspace still starts.
+        </Tip>
+      </Step>
+
+      <Step title="IDE opens automatically">
+        VS Code opens a new window connected to the workspace container over SSH. The workspace folder is mounted inside the container, and all extensions defined in `devcontainer.json` are installed automatically.
+
+        If VS Code does not open, connect manually:
+
+        ```bash
+        ssh MY_WORKSPACE_NAME.devpod
+        ```
+      </Step>
+
+      <Step title="Manage your workspaces">
+        List all workspaces and their status:
+
+        ```bash
+        devpod list
+        ```
+
+        Stop a running workspace:
+
+        ```bash
+        devpod stop MY_WORKSPACE_NAME
+        ```
+
+        Resume it later with `devpod up MY_WORKSPACE_NAME`.
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Desktop app">
+    <Steps>
+      <Step title="Add the Docker provider">
+        Open the DevPod desktop app and navigate to **Providers**. Click **Add Provider**, select **docker** from the list, and follow the prompts. DevPod detects your local Docker installation automatically.
+      </Step>
+
+      <Step title="Create a workspace">
+        Navigate to **Workspaces** and click **+ Create**. Enter a Git repository URL — for example, `https://github.com/microsoft/vscode-remote-try-go` — or pick one of the built-in quickstart examples.
+      </Step>
+
+      <Step title="Select your IDE">
+        Under **Default IDE**, choose **VS Code** (or any IDE you prefer). Then click **Create Workspace**.
+
+        A progress panel shows DevPod pulling the image, creating the container, and configuring SSH access.
+      </Step>
+
+      <Step title="IDE opens automatically">
+        Once the workspace is ready, VS Code opens a new window connected to the container. All extensions and settings from `devcontainer.json` are applied inside the container.
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Choosing an IDE
+
+Pass `--ide` to `devpod up` to open any supported IDE:
+
+| Value | IDE |
+|---|---|
+| `vscode` | Visual Studio Code (local) |
+| `vscode-insiders` | VS Code Insiders (local) |
+| `openvscode` | VS Code in the browser |
+| `cursor` | Cursor |
+| `codium` | VSCodium |
+| `windsurf` | Windsurf |
+| `intellij` | IntelliJ IDEA (via JetBrains Gateway) |
+| `goland` | GoLand (via JetBrains Gateway) |
+| `pycharm` | PyCharm (via JetBrains Gateway) |
+| `phpstorm` | PhpStorm (via JetBrains Gateway) |
+| `clion` | CLion (via JetBrains Gateway) |
+| `rider` | Rider (via JetBrains Gateway) |
+| `rubymine` | RubyMine (via JetBrains Gateway) |
+| `webstorm` | WebStorm (via JetBrains Gateway) |
+| `rustrover` | RustRover (via JetBrains Gateway) |
+| `zed` | Zed |
+| `jupyternotebook` | Jupyter Notebook (in browser) |
+| `rstudio` | RStudio Server (in browser) |
+| `none` | No IDE — SSH access only |
+
+<Info>
+  JetBrains IDEs require [JetBrains Gateway](https://www.jetbrains.com/remote-development/gateway/) to be installed on your local machine.
+</Info>
+
+## About devcontainer.json
+
+DevPod uses the [Dev Container specification](https://containers.dev/) to define the environment. If your repository already has a `.devcontainer/devcontainer.json` or `.devcontainer.json`, DevPod uses it automatically. If not, DevPod falls back to a default base image so the workspace still starts.
+
+A minimal `devcontainer.json` looks like this:
+
+```json
+{
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "postCreateCommand": "echo 'Workspace ready'"
+}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Workspaces" icon="box" href="/workspaces/what-are-workspaces">
+    Learn how DevPod manages and isolates workspaces.
+  </Card>
+  <Card title="Providers" icon="plug" href="/providers/what-are-providers">
+    Connect DevPod to Kubernetes, AWS, GCP, Azure, or any SSH machine.
+  </Card>
+  <Card title="devcontainer.json" icon="file-code" href="/workspaces/devcontainer-json">
+    Customise your environment with tools, extensions, and lifecycle scripts.
+  </Card>
+  <Card title="Dotfiles" icon="sliders" href="/workspaces/dotfiles">
+    Automatically install your personal dotfiles into every workspace.
+  </Card>
+</CardGroup>

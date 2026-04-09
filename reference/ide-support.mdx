@@ -1,0 +1,306 @@
+---
+title: "IDE support in DevPod: VS Code, JetBrains, Zed, and more"
+description: Full list of IDEs supported by DevPod, how to select them with --ide or devpod ide use, and notes on browser-based IDEs that require an open terminal session.
+---
+
+DevPod supports a wide range of editors and IDEs. Each workspace stores its IDE preference, so different workspaces can use different IDEs. You can set a default IDE for all new workspaces and override it per `devpod up` invocation using the `--ide` flag.
+
+## Setting the default IDE
+
+```bash
+devpod ide use <ide-name>
+```
+
+For example, to make VS Code the default:
+
+```bash
+devpod ide use vscode
+```
+
+## Selecting an IDE for a single workspace
+
+Pass `--ide` to `devpod up`:
+
+```bash
+devpod up my-workspace --ide cursor
+```
+
+## IDE reference
+
+### VS Code family
+
+These editors all use the VS Code Remote SSH extension under the hood. DevPod opens the workspace folder over SSH automatically.
+
+<AccordionGroup>
+
+<Accordion title="vscode — Visual Studio Code">
+
+The stable release of VS Code. DevPod opens a new VS Code window connected to the workspace over SSH.
+
+```bash
+devpod up my-workspace --ide vscode
+devpod ide use vscode
+```
+
+</Accordion>
+
+<Accordion title="vscode-insiders — VS Code Insiders">
+
+The pre-release channel of VS Code, updated daily. Useful for testing upcoming features.
+
+```bash
+devpod up my-workspace --ide vscode-insiders
+devpod ide use vscode-insiders
+```
+
+</Accordion>
+
+<Accordion title="openvscode — VS Code in browser (OpenVSCode Server)">
+
+Runs [OpenVSCode Server](https://github.com/gitpod-io/openvscode-server) inside the container and opens it in your browser. No local VS Code installation required.
+
+```bash
+devpod up my-workspace --ide openvscode
+devpod ide use openvscode
+```
+
+<Warning>
+Browser-based IDEs require the terminal running `devpod up` to remain open for the duration of the session. Closing the terminal disconnects the browser from the workspace.
+</Warning>
+
+</Accordion>
+
+<Accordion title="cursor — Cursor">
+
+The [Cursor](https://cursor.sh/) AI-powered editor. Uses the same VS Code Remote SSH mechanism as VS Code.
+
+```bash
+devpod up my-workspace --ide cursor
+devpod ide use cursor
+```
+
+</Accordion>
+
+<Accordion title="codium — VSCodium">
+
+The open-source VS Code build without Microsoft telemetry. Uses the Remote SSH extension.
+
+```bash
+devpod up my-workspace --ide codium
+devpod ide use codium
+```
+
+</Accordion>
+
+<Accordion title="positron — Positron">
+
+[Positron](https://github.com/posit-dev/positron) is a next-generation data science IDE built on VS Code by Posit.
+
+```bash
+devpod up my-workspace --ide positron
+devpod ide use positron
+```
+
+</Accordion>
+
+<Accordion title="windsurf — Windsurf">
+
+[Windsurf](https://codeium.com/windsurf) is the agentic IDE by Codeium, built on VS Code with deep AI integration.
+
+```bash
+devpod up my-workspace --ide windsurf
+devpod ide use windsurf
+```
+
+</Accordion>
+
+</AccordionGroup>
+
+### JetBrains
+
+JetBrains IDEs connect to the workspace through [JetBrains Gateway](https://www.jetbrains.com/remote-development/gateway/). DevPod starts the JetBrains backend inside the container and opens Gateway locally. Gateway must be installed.
+
+<AccordionGroup>
+
+<Accordion title="intellij — IntelliJ IDEA">
+
+```bash
+devpod up my-workspace --ide intellij
+devpod ide use intellij
+```
+
+</Accordion>
+
+<Accordion title="goland — GoLand">
+
+```bash
+devpod up my-workspace --ide goland
+devpod ide use goland
+```
+
+</Accordion>
+
+<Accordion title="pycharm — PyCharm">
+
+```bash
+devpod up my-workspace --ide pycharm
+devpod ide use pycharm
+```
+
+</Accordion>
+
+<Accordion title="phpstorm — PhpStorm">
+
+```bash
+devpod up my-workspace --ide phpstorm
+devpod ide use phpstorm
+```
+
+</Accordion>
+
+<Accordion title="clion — CLion">
+
+```bash
+devpod up my-workspace --ide clion
+devpod ide use clion
+```
+
+</Accordion>
+
+<Accordion title="rubymine — RubyMine">
+
+```bash
+devpod up my-workspace --ide rubymine
+devpod ide use rubymine
+```
+
+</Accordion>
+
+<Accordion title="rider — Rider">
+
+```bash
+devpod up my-workspace --ide rider
+devpod ide use rider
+```
+
+</Accordion>
+
+<Accordion title="webstorm — WebStorm">
+
+```bash
+devpod up my-workspace --ide webstorm
+devpod ide use webstorm
+```
+
+</Accordion>
+
+<Accordion title="dataspell — DataSpell">
+
+```bash
+devpod up my-workspace --ide dataspell
+devpod ide use dataspell
+```
+
+</Accordion>
+
+<Accordion title="rustrover — RustRover">
+
+```bash
+devpod up my-workspace --ide rustrover
+devpod ide use rustrover
+```
+
+</Accordion>
+
+<Accordion title="fleet — Fleet">
+
+JetBrains Fleet is a lightweight, collaborative IDE. DevPod starts the Fleet backend inside the container and opens a publicly reachable URL.
+
+```bash
+devpod up my-workspace --ide fleet
+devpod ide use fleet
+```
+
+<Warning>
+Fleet is exposed at a publicly reachable URL. Do not share this URL with others, as they would be able to access your workspace.
+</Warning>
+
+</Accordion>
+
+</AccordionGroup>
+
+### Other IDEs and browser-based tools
+
+<AccordionGroup>
+
+<Accordion title="zed — Zed">
+
+[Zed](https://zed.dev/) is a high-performance code editor built in Rust. DevPod connects Zed to the workspace over SSH.
+
+```bash
+devpod up my-workspace --ide zed
+devpod ide use zed
+```
+
+</Accordion>
+
+<Accordion title="jupyternotebook — Jupyter Notebook">
+
+Runs a Jupyter server inside the container and opens JupyterLab in your browser at `http://localhost:<port>/lab`.
+
+```bash
+devpod up my-workspace --ide jupyternotebook
+devpod ide use jupyternotebook
+```
+
+<Warning>
+Jupyter Notebook is a browser-based IDE. Keep the terminal running `devpod up` open for the duration of your session. Closing it stops the port-forwarding tunnel.
+</Warning>
+
+</Accordion>
+
+<Accordion title="rstudio — RStudio Server">
+
+Runs [RStudio Server](https://posit.co/products/open-source/rstudio-server/) inside the container and opens it in your browser.
+
+```bash
+devpod up my-workspace --ide rstudio
+devpod ide use rstudio
+```
+
+<Warning>
+RStudio Server is a browser-based IDE. Keep the terminal running `devpod up` open for the duration of your session.
+</Warning>
+
+</Accordion>
+
+<Accordion title="none — SSH only, no IDE">
+
+DevPod starts the workspace and configures SSH but does not open any IDE. Use this when you want to connect manually over SSH or from an editor that is not listed above.
+
+```bash
+devpod up my-workspace --ide none
+devpod ide use none
+```
+
+After the workspace is running, connect with:
+
+```bash
+devpod ssh my-workspace
+# or use the configured SSH alias:
+ssh my-workspace.devpod
+```
+
+<Note>
+Port forwarding requires an active SSH session when using `--ide none`. Run `devpod ssh my-workspace` and keep the terminal open while you need forwarded ports.
+</Note>
+
+</Accordion>
+
+</AccordionGroup>
+
+## IDE options
+
+Each IDE exposes configurable options accessible through `devpod ide options <name>` and settable with `devpod ide set-options <name> -o KEY=VALUE`.
+
+Common options across IDEs include whether to open a new window and, for browser-based IDEs, the bind address and whether to auto-open the browser. Consult `devpod ide options <ide-name>` for the full list specific to your IDE.

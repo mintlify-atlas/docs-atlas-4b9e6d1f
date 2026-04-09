@@ -1,0 +1,226 @@
+---
+title: "Shipping helper binaries with your DevPod provider"
+description: "Declare per-platform binaries in provider.yaml. DevPod downloads and verifies each binary automatically, then exposes it as an env var in all exec scripts."
+---
+
+The `binaries` section of `provider.yaml` lets you declare external helper programs that DevPod should download when the provider is added. Once downloaded, each binary's path is exposed as an environment variable in all `exec` scripts, option `command` fields, and `agent.exec` scripts — so your provider can call the binary by name without knowing where it was installed.
+
+This pattern is used by most official cloud providers: instead of shipping a single self-contained provider.yaml that calls generic shell utilities, they ship a purpose-built CLI binary that handles all cloud API interactions.
+
+## Why use binaries
+
+<CardGroup cols={2}>
+  <Card title="Cross-platform compatibility" icon="laptop">
+    Ship separate binaries for Linux, macOS, and Windows. DevPod picks the right one automatically based on the user's OS and architecture.
+  </Card>
+  <Card title="Avoid shell utility gaps" icon="terminal">
+    On Windows, DevPod uses an emulated POSIX shell that lacks `grep`, `sed`, and similar tools. Moving logic into a binary sidesteps this entirely.
+  </Card>
+  <Card title="Checksum verification" icon="shield-check">
+    Every binary is verified against a SHA checksum before execution, ensuring the binary in `provider.yaml` is exactly what runs on the user's machine.
+  </Card>
+  <Card title="Agent-side binaries" icon="robot">
+    Declare binaries for the remote machine under `agent.binaries`. These are downloaded on the VM and used in `agent.exec.shutdown` for auto-inactivity stop.
+  </Card>
+</CardGroup>
+
+## Providers that use binaries
+
+The following official providers all ship helper binaries:
+
+- [devpod-provider-aws](https://github.com/loft-sh/devpod-provider-aws/releases)
+- [devpod-provider-azure](https://github.com/loft-sh/devpod-provider-azure/releases)
+- [devpod-provider-civo](https://github.com/loft-sh/devpod-provider-civo/releases)
+- [devpod-provider-digitalocean](https://github.com/loft-sh/devpod-provider-digitalocean/releases)
+- [devpod-provider-gcloud](https://github.com/loft-sh/devpod-provider-gcloud/releases)
+
+## Declaring binaries
+
+Each binary is declared under a key name in the `binaries` map. The key becomes the environment variable name. Under each key, provide a list of platform-specific download entries:
+
+```yaml
+binaries:
+  NAME:
+    - os:          # Target OS
+      arch:        # Target architecture
+      path:        # Remote URL or local file path to the binary
+      checksum:    # SHA256 checksum of the binary
+      archivePath: # Relative path inside the archive (for .tgz, .tar, .tar.gz, .zip)
+```
+
+DevPod reads the user's OS and architecture, finds the matching entry, downloads it, verifies the checksum, and makes the binary available at the path stored in the environment variable `NAME`.
+
+## Binary fields reference
+
+<ParamField path="binaries.<NAME>[].os" type="string" required>
+  The target operating system. Accepted values: `linux`, `darwin`, `windows`.
+</ParamField>
+
+<ParamField path="binaries.<NAME>[].arch" type="string" required>
+  The CPU architecture. Accepted values: `amd64`, `arm64`.
+</ParamField>
+
+<ParamField path="binaries.<NAME>[].path" type="string" required>
+  URL to download the binary from, or a local file path. HTTPS URLs are recommended. For Windows binaries, include the `.exe` extension in the filename.
+</ParamField>
+
+<ParamField path="binaries.<NAME>[].checksum" type="string" required>
+  The SHA256 checksum of the binary file. DevPod verifies this before executing the binary. If the checksum does not match, the download is rejected.
+</ParamField>
+
+<ParamField path="binaries.<NAME>[].archivePath" type="string">
+  The relative path to the binary inside an archive. Required when `path` points to a compressed archive. Supported archive formats: `.tgz`, `.tar`, `.tar.gz`, `.zip`.
+
+  Example: `bin/my-tool` for a binary at `bin/my-tool` inside the archive.
+</ParamField>
+
+## Real-world example: AWS provider binary
+
+```yaml
+binaries:
+  AWS_PROVIDER:
+    - os: linux
+      arch: amd64
+      path: https://github.com/loft-sh/devpod-provider-aws/releases/download/v0.0.1-alpha.15/devpod-provider-aws-linux-amd64
+      checksum: d1e774419d90c3ed399963d9322d57bfdcee189767eabb076a2c2e926bfd9b8b
+    - os: linux
+      arch: arm64
+      path: https://github.com/loft-sh/devpod-provider-aws/releases/download/v0.0.1-alpha.15/devpod-provider-aws-linux-arm64
+      checksum: fa15c13e3f0619170d002f9dae3ef41c9949a4595a71c5efe364d89ada604cec
+    - os: darwin
+      arch: amd64
+      path: https://github.com/loft-sh/devpod-provider-aws/releases/download/v0.0.1-alpha.15/devpod-provider-aws-darwin-amd64
+      checksum: fb89d41f6ce3e01e953f3ffd18f85bd5a42dd633abafd5d586dc9d9b1322166c
+    - os: darwin
+      arch: arm64
+      path: https://github.com/loft-sh/devpod-provider-aws/releases/download/v0.0.1-alpha.15/devpod-provider-aws-darwin-arm64
+      checksum: 82b6713069fa061ea59941600ed32a15f73806a9af3074d67a20ed367d18b2aa
+    - os: windows
+      arch: amd64
+      path: https://github.com/loft-sh/devpod-provider-aws/releases/download/v0.0.1-alpha.15/devpod-provider-aws-windows-amd64.exe
+      checksum: 49bd899d439f38d4e8647102db1c18b7a0d5242b3c09c89071b20a5444e20a81
+```
+
+## Using binaries in exec commands
+
+After declaring a binary, reference it in any exec script using the uppercased key name as an environment variable:
+
+```yaml
+binaries:
+  MY_BINARY:
+    - os: linux
+      arch: amd64
+      path: https://example.com/my-binary-linux-amd64
+      checksum: abc123
+
+exec:
+  init:   ${MY_BINARY} init
+  create: ${MY_BINARY} create
+  delete: ${MY_BINARY} delete
+  start:  ${MY_BINARY} start
+  stop:   ${MY_BINARY} stop
+  status: ${MY_BINARY} status
+  command: |-
+    ssh -oStrictHostKeyChecking=no "${HOST}" "${COMMAND}"
+```
+
+The Google Cloud provider follows exactly this pattern:
+
+```yaml
+binaries:
+  GCLOUD_PROVIDER:
+    - os: linux
+      arch: amd64
+      path: https://github.com/loft-sh/devpod-provider-gcloud/releases/download/v0.0.1-alpha.10/devpod-provider-gcloud-linux-amd64
+      checksum: 38f92457507563ee56ea40a2ec40196d12ac2bbd50a924d76f55827e96e5f831
+    - os: linux
+      arch: arm64
+      path: https://github.com/loft-sh/devpod-provider-gcloud/releases/download/v0.0.1-alpha.10/devpod-provider-gcloud-linux-arm64
+      checksum: 48e8dfa20962f1c3eb1e3da17d57842a0e26155df2b94377bcdf5b8070d7b17e
+    - os: darwin
+      arch: amd64
+      path: https://github.com/loft-sh/devpod-provider-gcloud/releases/download/v0.0.1-alpha.10/devpod-provider-gcloud-darwin-amd64
+      checksum: 43ee6ecb7855d282a0512ccf6055cce029895f173beb95a8c442f77560d26678
+    - os: darwin
+      arch: arm64
+      path: https://github.com/loft-sh/devpod-provider-gcloud/releases/download/v0.0.1-alpha.10/devpod-provider-gcloud-darwin-arm64
+      checksum: c2c2d57c5d48f22814f2393f61fd6a78bdc2cde7eabc3faffd8f35eaceec4422
+    - os: windows
+      arch: amd64
+      path: https://github.com/loft-sh/devpod-provider-gcloud/releases/download/v0.0.1-alpha.10/devpod-provider-gcloud-windows-amd64.exe
+      checksum: 9b81ec48c849f222aaf30f0cb85057d4e6619d1c0f787b27925c8b8adb431a58
+exec:
+  init:   ${GCLOUD_PROVIDER} init
+  command: ${GCLOUD_PROVIDER} command
+  create: ${GCLOUD_PROVIDER} create
+  delete: ${GCLOUD_PROVIDER} delete
+  start:  ${GCLOUD_PROVIDER} start
+  stop:   ${GCLOUD_PROVIDER} stop
+  status: ${GCLOUD_PROVIDER} status
+```
+
+## Using binaries in option commands
+
+Binaries can also be referenced in option `command` fields to dynamically compute option values:
+
+```yaml
+binaries:
+  MY_BINARY:
+    - os: linux
+      arch: amd64
+      path: https://example.com/my-binary-linux-amd64
+      checksum: abc123
+
+options:
+  MY_OPTION:
+    description: A dynamically computed option value.
+    command: ${MY_BINARY} retrieve-option
+```
+
+## Using binaries on the agent side
+
+Binaries declared under `agent.binaries` are downloaded onto the **remote machine** rather than the local machine. These are available in `agent.exec.shutdown` for calling cloud APIs during auto-inactivity stop:
+
+```yaml
+agent:
+  path: ${AGENT_PATH}
+  inactivityTimeout: 10m
+  binaries:
+    GCLOUD_PROVIDER:
+      - os: linux
+        arch: amd64
+        path: https://github.com/loft-sh/devpod-provider-gcloud/releases/download/v0.0.1-alpha.10/devpod-provider-gcloud-linux-amd64
+        checksum: 38f92457507563ee56ea40a2ec40196d12ac2bbd50a924d76f55827e96e5f831
+      - os: linux
+        arch: arm64
+        path: https://github.com/loft-sh/devpod-provider-gcloud/releases/download/v0.0.1-alpha.10/devpod-provider-gcloud-linux-arm64
+        checksum: 48e8dfa20962f1c3eb1e3da17d57842a0e26155df2b94377bcdf5b8070d7b17e
+  exec:
+    shutdown: |-
+      ${GCLOUD_PROVIDER} stop --raw
+```
+
+<Note>
+`agent.binaries` and the top-level `binaries` section share the same syntax. The only difference is where DevPod downloads them: top-level binaries go on the local machine, `agent.binaries` go on the remote machine.
+</Note>
+
+## Checksum verification
+
+Every binary entry requires a `checksum` field containing the SHA256 hash of the downloaded file. DevPod verifies this hash before executing the binary. If verification fails, the binary is rejected and an error is reported.
+
+<Warning>
+Always provide checksums for your binaries. Omitting checksum verification would allow a compromised download to execute arbitrary code on the user's machine.
+</Warning>
+
+To generate a SHA256 checksum:
+
+```bash
+# Linux / macOS
+sha256sum ./my-binary
+
+# macOS alternative
+shasum -a 256 ./my-binary
+
+# Windows (PowerShell)
+Get-FileHash .\my-binary.exe -Algorithm SHA256
+```

@@ -1,0 +1,213 @@
+---
+title: "Create a DevPod workspace from Git, folder, or image"
+description: "Create DevPod workspaces from a Git repository, local folder, or Docker image using the CLI or desktop app. Covers flags, IDE selection, and recreate options."
+---
+
+You can create a workspace from the DevPod CLI or the desktop application. DevPod accepts a Git repository URL, a local folder path, or a Docker image as the workspace source. After a workspace is created, DevPod configures SSH access and optionally opens your chosen IDE automatically.
+
+<Info>
+  A workspace is defined by a `devcontainer.json`. If DevPod cannot find one in the project, it automatically detects the programming language and applies a suitable default configuration.
+</Info>
+
+## Create from a Git repository
+
+<Tabs>
+  <Tab title="CLI">
+    Run `devpod up` with a Git repository URL:
+
+    ```bash
+    devpod up github.com/microsoft/vscode-remote-try-node
+    ```
+
+    You can target a specific branch, commit, or pull request by appending a ref:
+
+    ```bash
+    # Branch
+    devpod up github.com/microsoft/vscode-remote-try-node@main
+
+    # Commit
+    devpod up github.com/microsoft/vscode-remote-try-node@sha256:15ba80171af11374143288fd3d54898860107323
+
+    # Pull request (GitHub only)
+    devpod up github.com/microsoft/vscode-remote-try-node@pull/108/head
+    ```
+
+    <Info>
+      DevPod forwards your local Git credentials to the remote machine so you can clone private repositories without additional setup.
+    </Info>
+  </Tab>
+  <Tab title="Desktop app">
+    <Steps>
+      <Step title="Open the Workspaces view">
+        Navigate to the **Workspaces** view in the sidebar.
+      </Step>
+      <Step title="Click Create">
+        Click the **Create** button in the title bar.
+      </Step>
+      <Step title="Enter the repository URL">
+        Type or paste the Git repository URL into the input field.
+      </Step>
+      <Step title="Configure options">
+        Optionally set the provider, default IDE, workspace name, and prebuild repository.
+      </Step>
+      <Step title="Launch the workspace">
+        Click **Create Workspace** to build and start the environment.
+      </Step>
+    </Steps>
+
+    <Note>
+      If you have not configured a provider yet, DevPod will prompt you to add one before creating the workspace. You can add providers later via **Providers** > **Add**.
+    </Note>
+  </Tab>
+</Tabs>
+
+## Create from a local folder
+
+<Tabs>
+  <Tab title="CLI">
+    Pass a local path to `devpod up`:
+
+    ```bash
+    devpod up ./path/to/my-folder
+    ```
+
+    DevPod syncs the folder into the remote machine and reads the `devcontainer.json` from it.
+  </Tab>
+  <Tab title="Desktop app">
+    In the **Create Workspace** dialog, click **Select Folder** and choose a local directory. DevPod will sync it to the provider and create the environment.
+  </Tab>
+</Tabs>
+
+## Create from a Docker image
+
+To create a workspace directly from a container image, pass the image reference:
+
+```bash
+devpod up ghcr.io/my-org/my-repo:latest
+```
+
+DevPod generates the following minimal configuration and uses it to start the environment:
+
+```json
+{
+  "image": "ghcr.io/my-org/my-repo:latest"
+}
+```
+
+## Create from an existing local container
+
+If you have a running container on the `docker` provider, you can attach a workspace to it:
+
+```bash
+devpod up my-workspace --source container:$CONTAINER_ID
+```
+
+<Warning>
+  This option only works with the `docker` provider. Using `--recreate` on a container-backed workspace is not supported.
+</Warning>
+
+## Common flags
+
+These flags apply to `devpod up` regardless of the source type:
+
+| Flag | Description |
+|---|---|
+| `--ide <name>` | Open the workspace in the specified IDE (e.g. `vscode`, `goland`, `openvscode`) |
+| `--provider <name>` | Use a specific provider for this workspace |
+| `--id <name>` | Override the auto-generated workspace name |
+| `--devcontainer-image <image>` | Override the container image specified in `devcontainer.json` |
+| `--devcontainer-path <path>` | Path to a specific `devcontainer.json` file relative to the project root |
+| `--prebuild-repository <registry>` | Docker registry to search for prebuilt workspace images |
+| `--dotfiles <url>` | Clone and install a dotfiles repository in the workspace |
+| `--dotfiles-script <path>` | Custom install script within the dotfiles repository |
+| `--gpg-agent-forwarding` | Forward your local GPG agent into the workspace |
+| `--workspace-env KEY=VALUE` | Inject extra environment variables into the workspace |
+| `--recreate` | Remove the existing container and recreate it from the current `devcontainer.json` |
+| `--reset` | Remove the container and re-pull sources before recreating (no state preserved) |
+
+### Selecting an IDE
+
+Pass `--ide` with any supported IDE name:
+
+```bash
+# VS Code (desktop)
+devpod up github.com/my-org/my-repo --ide vscode
+
+# VS Code in a browser
+devpod up github.com/my-org/my-repo --ide openvscode
+
+# GoLand via JetBrains Gateway
+devpod up github.com/my-org/my-repo --ide goland
+```
+
+Supported IDE names: `vscode`, `vscode-insiders`, `openvscode`, `cursor`, `codium`, `positron`, `windsurf`, `intellij`, `goland`, `pycharm`, `phpstorm`, `clion`, `rubymine`, `rider`, `webstorm`, `dataspell`, `rustrover`, `fleet`, `jupyternotebook`, `rstudio`, `zed`, `none`.
+
+### Creating multiple workspaces from one repository
+
+Use `--id` to assign a custom name and create multiple workspaces from the same source:
+
+```bash
+devpod up github.com/my-org/my-repo --id feature-branch-a
+devpod up github.com/my-org/my-repo --id feature-branch-b
+```
+
+### Setting the DevPod home directory
+
+You can override the location where DevPod stores workspace data with the `--devpod-home` flag or the `DEVPOD_HOME` environment variable:
+
+```bash
+devpod up github.com/my-org/my-repo --devpod-home /mnt/c/Users/MyUser/
+```
+
+This is useful on WSL when you need workspace paths to resolve inside the Linux filesystem rather than a Windows mount.
+
+## Recreate a workspace
+
+Recreating a workspace applies changes made to `devcontainer.json` or a referenced `Dockerfile` without deleting your project files.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    devpod up my-workspace --recreate
+    ```
+  </Tab>
+  <Tab title="Desktop app">
+    In the **Workspaces** view, click **More Options** on the workspace, then click **Rebuild** and confirm.
+  </Tab>
+</Tabs>
+
+<Warning>
+  Changes in the container overlay layer (anything outside mounted volumes) will be lost when recreating. Changes within the project path and mounted volumes are preserved.
+</Warning>
+
+## Reset a workspace
+
+Resetting a workspace re-pulls sources from scratch and recreates the container. No state is preserved.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    devpod up my-workspace --reset
+    ```
+  </Tab>
+  <Tab title="Desktop app">
+    In the **Workspaces** view, click **More Options** on the workspace, then click **Reset** and confirm.
+  </Tab>
+</Tabs>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Connect to a workspace" icon="terminal" href="/workspaces/connect-to-workspace">
+    Open your workspace in VS Code, JetBrains, or connect via SSH.
+  </Card>
+  <Card title="Prebuilds" icon="bolt" href="/workspaces/prebuilds">
+    Pre-build workspace images to speed up creation time.
+  </Card>
+  <Card title="Dotfiles" icon="sliders" href="/workspaces/dotfiles">
+    Automatically install your dotfiles into every workspace.
+  </Card>
+  <Card title="devcontainer.json" icon="file-code" href="/workspaces/devcontainer-json">
+    Learn how to configure your dev environment with devcontainer.json.
+  </Card>
+</CardGroup>

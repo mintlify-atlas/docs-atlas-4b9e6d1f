@@ -1,0 +1,233 @@
+---
+title: "Manage DevPod providers: list, update, delete, and configure"
+description: "View installed providers, update them to new versions, reconfigure options, set a default, and safely delete providers you no longer need."
+---
+
+After adding providers to DevPod, you can inspect their state and options, update them to newer versions, switch your default, and remove providers you no longer use. All management operations are available through the CLI and most are also accessible in the Desktop App.
+
+## List installed providers
+
+To see all providers currently registered with DevPod, along with their version, default status, and initialization state:
+
+```bash
+devpod provider list
+```
+
+Example output:
+
+```
+    NAME    | VERSION | DEFAULT | INITIALIZED |    DESCRIPTION
+------------+---------+---------+-------------+--------------------
+ aws        | v0.4.1  | false   | true        | DevPod on AWS
+ docker     | v0.0.1  | true    | true        | DevPod on Docker
+ kubernetes | v0.0.1  | false   | true        | DevPod on Kubernetes
+```
+
+For machine-readable output, use JSON format:
+
+```bash
+devpod provider list --output json
+```
+
+## View and change provider options
+
+### View current options
+
+Inspect the full option table for any installed provider:
+
+```bash
+devpod provider options <provider-name>
+```
+
+```bash
+devpod provider options docker
+devpod provider options aws
+devpod provider options kubernetes
+```
+
+### Update individual options
+
+Change one or more options without reconfiguring the whole provider:
+
+```bash
+devpod provider set-options <provider-name> --option <KEY>=<VALUE>
+```
+
+Examples:
+
+```bash
+# Increase the default AWS disk size
+devpod provider set-options aws --option AWS_DISK_SIZE=120
+
+# Point the Docker provider at a remote Docker host
+devpod provider set-options docker --option DOCKER_HOST=tcp://192.168.1.10:2376
+
+# Set an inactivity timeout on a Kubernetes provider
+devpod provider set-options kubernetes --option INACTIVITY_TIMEOUT=1h
+```
+
+### Reconfigure all options interactively
+
+To re-run the full option configuration flow for a provider (replacing previously set values):
+
+```bash
+devpod provider use <provider-name> --reconfigure
+```
+
+## Set the default provider
+
+When creating a workspace, DevPod uses the default provider unless you specify one explicitly with `--provider`. To change which provider is the default:
+
+```bash
+devpod use provider <provider-name>
+```
+
+```bash
+devpod use provider docker
+devpod use provider aws
+```
+
+You can also pass options at the same time to update the configuration and set the default in a single command:
+
+```bash
+devpod use provider aws --option AWS_REGION=eu-west-1
+```
+
+## Update a provider
+
+Updating a provider fetches the latest `provider.yaml` from the original source and applies it. The provider's name and existing option values are preserved.
+
+<Steps>
+  <Step title="Update to the latest version">
+    Run `devpod provider update` with the provider name. DevPod fetches the latest release from the original source automatically.
+
+    ```bash
+    devpod provider update <provider-name>
+    ```
+
+    ```bash
+    devpod provider update aws
+    devpod provider update kubernetes
+    ```
+  </Step>
+  <Step title="Update from a specific GitHub release">
+    To update to a specific version (or downgrade), append the repository and version tag:
+
+    ```bash
+    devpod provider update aws loft-sh/devpod-provider-aws@v0.4.0
+    ```
+  </Step>
+  <Step title="Update from a URL">
+    Point the update at a specific `provider.yaml` URL:
+
+    ```bash
+    devpod provider update aws https://github.com/loft-sh/devpod-provider-aws/releases/download/v0.4.1/provider.yaml
+    ```
+  </Step>
+  <Step title="Update from a local file">
+    If you are developing a provider locally, update from the file on disk:
+
+    ```bash
+    devpod provider update my-provider ../devpod-provider-custom/provider.yaml
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  The desktop application does not currently have an update button for providers. Use the CLI to update providers to a new version.
+</Note>
+
+## Delete a provider
+
+Removing a provider unregisters it from DevPod and deletes its local configuration.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    devpod provider delete <provider-name>
+    ```
+
+    ```bash
+    devpod provider delete aws
+    devpod provider delete kubernetes
+    ```
+
+    <Warning>
+      Delete all workspaces that use a provider before deleting the provider itself. If you delete a provider while workspaces are still attached to it, those workspaces will become inaccessible until you reinstall the provider. Move workspaces to a different provider, or delete them first with `devpod delete <workspace-name>`.
+    </Warning>
+  </Tab>
+  <Tab title="Desktop App">
+    1. Open the **Providers** view in the sidebar.
+    2. Click the **trash** icon next to the provider you want to remove.
+    3. If workspaces are attached to the provider, you will be prompted to remove them before the provider can be deleted.
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Provider fails to initialize after add">
+    If `devpod provider add` succeeds but the provider shows as uninitialized in `devpod provider list`, try reconfiguring it:
+
+    ```bash
+    devpod provider use <provider-name> --reconfigure
+    ```
+
+    Check that all required options have been set correctly. View them with:
+
+    ```bash
+    devpod provider options <provider-name>
+    ```
+
+    Any option in the `REQUIRED` column that has no `VALUE` must be set before the provider can initialize.
+  </Accordion>
+  <Accordion title="Workspace is stuck after provider was deleted">
+    If you deleted a provider without first removing its workspaces, reinstall the provider using the same source:
+
+    ```bash
+    devpod provider add <name-or-url>
+    ```
+
+    Once reinstalled, you can either resume the workspace normally or delete it cleanly:
+
+    ```bash
+    devpod delete <workspace-name>
+    ```
+  </Accordion>
+  <Accordion title="Provider options are not taking effect">
+    Options set with `devpod provider set-options` apply to new workspaces. Existing workspaces that were already started will use the options from when they were created.
+
+    To apply updated options to an existing workspace, stop and restart it:
+
+    ```bash
+    devpod stop <workspace-name>
+    devpod up <workspace-name>
+    ```
+  </Accordion>
+  <Accordion title="Wrong provider is being used for new workspaces">
+    Check which provider is currently set as the default:
+
+    ```bash
+    devpod provider list
+    ```
+
+    The `DEFAULT` column shows `true` for the active default. Switch it with:
+
+    ```bash
+    devpod use provider <provider-name>
+    ```
+
+    You can also specify the provider explicitly when creating a workspace to bypass the default:
+
+    ```bash
+    devpod up <workspace> --provider <provider-name>
+    ```
+  </Accordion>
+  <Accordion title="devpod provider update has no effect">
+    If the provider is already on the latest version, the update command will still succeed but no changes will be applied. To force a reinstall from a specific version, use the `@version` syntax:
+
+    ```bash
+    devpod provider update <provider-name> <owner>/<repo>@<version>
+    ```
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,266 @@
+---
+title: "Configuring provider options in DevPod provider.yaml"
+description: "Define provider options in provider.yaml. DevPod passes each option as an env var to exec scripts, supporting defaults, required validation, and dynamic commands."
+---
+
+Options are named configuration values that users supply when adding or configuring a provider. DevPod takes each option and passes it as an environment variable to every `exec` script and to the `agent` section. This lets your provider scripts behave differently based on user input — for example, targeting different regions, VM sizes, or cloud accounts — without hardcoding anything in the manifest.
+
+## Defining options
+
+Options are declared in the `options` map. Each key is the environment variable name that will be set at runtime:
+
+```yaml
+options:
+  MY_OPTION_NAME:
+    description: "this is my option"
+    default: "default_value"
+    required: false
+    password: true
+```
+
+When DevPod calls any `exec` script, `MY_OPTION_NAME` is available as an environment variable. Your script reads it like any other env var:
+
+```bash
+echo "Option value is: ${MY_OPTION_NAME}"
+```
+
+## How options work
+
+Options represent variables that a provider needs to function. Common examples include:
+
+- User account identifiers or API keys
+- VM image names or IDs
+- VM sizes or instance types
+- Cloud region or datacenter location
+
+DevPod parses and validates options when the provider is added via `devpod provider add` or when options are updated. Required options without a default cause DevPod to prompt the user. Options are then passed to every `exec` command as environment variables.
+
+It is the provider's responsibility to read these variables and validate them. The recommended pattern is to use `exec.init` for validation:
+
+```go
+// From devpod-provider-aws: parsing and validating option env vars
+diskSizeGB, err := fromEnvOrError("AWS_DISK_SIZE")
+if err != nil {
+    return nil, err
+}
+
+retOptions.DiskSizeGB, err = strconv.Atoi(diskSizeGB)
+if err != nil {
+    return nil, err
+}
+```
+
+Options are also forwarded to the agent side, so they can be used in `agent.exec.shutdown` for auto-inactivity stop commands.
+
+## Option fields reference
+
+<ParamField path="options.<KEY>.description" type="string">
+  Human-readable explanation of the option. Shown in `devpod provider options` output and as a label in the Desktop App.
+</ParamField>
+
+<ParamField path="options.<KEY>.default" type="string">
+  The default value when the user does not supply one. Can reference other options using `${OTHER_OPTION}`, for example `${MY_OTHER_VAR}-suffix`. DevPod resolves dependencies automatically.
+
+  If not specified, defaults to an empty string.
+</ParamField>
+
+<ParamField path="options.<KEY>.required" type="boolean" default="false">
+  If `true` and no default is set, DevPod prompts the user for a value before the provider can be used. In the Desktop App, required options are highlighted on the provider's Add page.
+</ParamField>
+
+<ParamField path="options.<KEY>.password" type="boolean" default="false">
+  If `true`, the option value is treated as a secret. It will show as `********` in `devpod provider options` output and as a password field in the Desktop App.
+
+  Example output when `password: true` is set:
+  ```
+  NAME          | REQUIRED | DESCRIPTION            | VALUE
+  CIVO_API_KEY  | true     | The civo api key       | ********
+  ```
+</ParamField>
+
+<ParamField path="options.<KEY>.global" type="boolean">
+  If `true`, the option value is shared across all workspaces created with this provider. Use this for settings that apply to the entire provider account, such as a cloud region or Docker host.
+</ParamField>
+
+<ParamField path="options.<KEY>.local" type="boolean">
+  If `true`, the option is filled individually for each workspace or machine. Use this for workspace-specific settings.
+</ParamField>
+
+<ParamField path="options.<KEY>.hidden" type="boolean" default="false">
+  If `true`, the option is not shown in the Desktop App or in `devpod provider options`. Useful for storing computed values, session tokens, or internal state that should not be visible to users.
+</ParamField>
+
+<ParamField path="options.<KEY>.type" type="string" default="string">
+  The data type of the option. Accepted values:
+
+  | Type | Description |
+  |------|-------------|
+  | `string` | Plain text (default) |
+  | `number` | Numeric value |
+  | `boolean` | `true` or `false` |
+  | `duration` | Time duration, e.g. `10m`, `1h` |
+  | `multiline` | Multi-line text, shown as a textarea in the Desktop App |
+</ParamField>
+
+<ParamField path="options.<KEY>.enum" type="string[]">
+  A list of allowed values. DevPod rejects any value not in this list.
+</ParamField>
+
+<ParamField path="options.<KEY>.suggestions" type="string[]">
+  A list of suggested values shown as autocomplete options in the Desktop App. Unlike `enum`, suggestions do not restrict the input — the user can still type a custom value.
+
+  <Note>
+  Suggestions are only shown in the Desktop App. They have no effect on the CLI.
+  </Note>
+</ParamField>
+
+<ParamField path="options.<KEY>.command" type="string">
+  A shell command that DevPod runs to populate the option value automatically. The command's stdout becomes the option value. Can reference other options: `echo ${MY_OTHER_VAR}-suffix`.
+
+  On Windows, this command runs in an emulated POSIX shell for compatibility.
+
+  <Note>
+  Commands are re-evaluated when options are refreshed. Use the `cache` field to control how often.
+  </Note>
+</ParamField>
+
+<ParamField path="options.<KEY>.cache" type="string">
+  Duration after which DevPod re-runs `command` to refresh the option value. Example: `5m` refreshes every 5 minutes. Useful for short-lived tokens.
+</ParamField>
+
+## Dynamic option commands
+
+The `command` attribute lets you compute an option value from a local shell command. This is useful for forwarding local environment variables into the provider:
+
+```yaml
+options:
+  AWS_ACCESS_KEY_ID:
+    description: The aws access key id
+    required: false
+    command: printf "%s" "${AWS_ACCESS_KEY_ID:-}"
+  AWS_SECRET_ACCESS_KEY:
+    description: The aws secret access key
+    required: false
+    command: printf "%s" "${AWS_SECRET_ACCESS_KEY:-}"
+```
+
+You can also call a helper binary declared in the `binaries` section to retrieve a token dynamically:
+
+```yaml
+options:
+  AWS_TOKEN:
+    local: true
+    hidden: true
+    cache: 5m
+    description: "The AWS auth token to use"
+    command: |-
+      ${AWS_PROVIDER} token
+```
+
+## Built-in options
+
+DevPod provides a set of predefined variables you can reference inside `default` values and `command` scripts. Some are only available for `local` options or specific provider types.
+
+<AccordionGroup>
+  <Accordion title="Available everywhere">
+    | Variable | Description |
+    |----------|-------------|
+    | `DEVPOD` | Absolute path to the local DevPod binary |
+    | `DEVPOD_OS` | Current OS: `linux`, `darwin`, or `windows` |
+    | `DEVPOD_ARCH` | CPU architecture: `amd64` or `arm64` |
+  </Accordion>
+
+  <Accordion title="Machine providers (local options and commands)">
+    | Variable | Description |
+    |----------|-------------|
+    | `MACHINE_ID` | The ID of the machine being created or managed |
+    | `MACHINE_FOLDER` | Local folder for caching machine-specific data |
+    | `MACHINE_CONTEXT` | The DevPod context this machine belongs to |
+    | `MACHINE_PROVIDER` | The provider name used to create this machine |
+  </Accordion>
+
+  <Accordion title="Non-machine providers (local options and commands)">
+    | Variable | Description |
+    |----------|-------------|
+    | `WORKSPACE_ID` | The workspace ID |
+    | `WORKSPACE_FOLDER` | Local folder for caching workspace-specific data |
+    | `WORKSPACE_CONTEXT` | The DevPod context this workspace belongs to |
+    | `WORKSPACE_PROVIDER` | The provider name used to create this workspace |
+    | `PROVIDER_ID` | The provider name |
+    | `PROVIDER_CONTEXT` | The provider context |
+    | `PROVIDER_FOLDER` | Local folder where provider-global config is stored (e.g. session tokens) |
+  </Accordion>
+</AccordionGroup>
+
+## Option groups
+
+Option groups organize options into named, collapsible sections in the Desktop App. This has no effect on the CLI.
+
+```yaml
+optionGroups:
+  - options:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_AMI
+      - AWS_DISK_SIZE
+      - AWS_INSTANCE_TYPE
+      - AWS_VPC_ID
+    name: "AWS options"
+    defaultVisible: true
+  - options:
+      - AGENT_PATH
+      - INACTIVITY_TIMEOUT
+      - INJECT_DOCKER_CREDENTIALS
+      - INJECT_GIT_CREDENTIALS
+    name: "Agent options"
+    defaultVisible: false
+```
+
+<ParamField path="optionGroups[].name" type="string" required>
+  The display name for the option group section.
+</ParamField>
+
+<ParamField path="optionGroups[].options" type="string[]" required>
+  List of option keys to display in this group.
+</ParamField>
+
+<ParamField path="optionGroups[].defaultVisible" type="boolean" default="false">
+  If `false`, the group is collapsed and the user must click to expand it. If `true`, the group is open by default.
+</ParamField>
+
+## Full example
+
+A typical cloud provider option set covering authentication, instance sizing, and agent configuration:
+
+```yaml
+options:
+  AGENT_PATH:
+    description: The path where to inject the DevPod agent to.
+    default: /var/lib/toolbox/devpod
+  INACTIVITY_TIMEOUT:
+    description: "Automatically stop the VM after inactivity. Examples: 10m, 1h"
+  INJECT_GIT_CREDENTIALS:
+    description: Whether to inject local git credentials into the workspace.
+    default: "true"
+  INJECT_DOCKER_CREDENTIALS:
+    description: Whether to inject local Docker credentials into the workspace.
+    default: "true"
+  MY_CLOUD_API_KEY:
+    description: Your cloud provider API key.
+    required: true
+    password: true
+  REGION:
+    description: The cloud region to create the VM in.
+    default: us-east-1
+    suggestions:
+      - us-east-1
+      - us-west-2
+      - eu-central-1
+  INSTANCE_TYPE:
+    description: The VM instance type.
+    default: t3.medium
+  DISK_SIZE:
+    description: The disk size in GB.
+    default: "50"
+    type: number
+```

@@ -1,0 +1,133 @@
+---
+title: "Install DevPod: desktop app, CLI, and shell completion"
+description: "Install DevPod on macOS, Windows, or Linux using the desktop app or the CLI. Covers download links, shell completion, and upgrading."
+---
+
+DevPod is available as a desktop application and as a standalone CLI binary. The desktop app is the easiest way to get started — it includes the CLI and a graphical interface for managing workspaces and providers. If you prefer to work from a terminal, install the CLI directly.
+
+## Desktop app
+
+Download the installer for your operating system:
+
+<CardGroup cols={2}>
+  <Card title="macOS (Apple Silicon)" icon="apple" href="https://github.com/loft-sh/devpod/releases/latest/download/DevPod_macos_aarch64.dmg">
+    ARM64 — M1, M2, M3, and later
+  </Card>
+  <Card title="macOS (Intel)" icon="apple" href="https://github.com/loft-sh/devpod/releases/latest/download/DevPod_macos_x64.dmg">
+    AMD64 — Intel-based Macs
+  </Card>
+  <Card title="Windows" icon="windows" href="https://github.com/loft-sh/devpod/releases/latest/download/DevPod_windows_x64_en-US.msi">
+    x64 MSI installer for Windows 10 and later
+  </Card>
+  <Card title="Linux (AppImage)" icon="linux" href="https://github.com/loft-sh/devpod/releases/latest/download/DevPod_linux_amd64.AppImage">
+    AppImage for Debian, Ubuntu, Fedora, openSUSE, and Arch
+  </Card>
+</CardGroup>
+
+<Note>
+  For earlier releases, visit the [GitHub releases page](https://github.com/loft-sh/devpod/releases).
+</Note>
+
+<Info>
+  **Windows**: The installer requires [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/), which ships with recent versions of Windows and does not normally need a separate install.
+</Info>
+
+<Info>
+  **Linux AppImage**: The AppImage has been tested on Debian 12+, Ubuntu 22.04+, Fedora 36+, openSUSE Leap 15.3+, openSUSE Tumbleweed, and Arch Linux. Make sure these dependencies are present:
+
+  ```bash
+  # Debian / Ubuntu
+  sudo apt-get install fuse libfuse2 libopengl0 libfribidi0 libgles2-mesa
+
+  # Fedora
+  sudo dnf install fuse fuse-libs libglvnd-egl libglvnd-opengl libglvnd-glx harfbuzz fontconfig fribidi libthai
+
+  # openSUSE
+  sudo zypper in fuse libfuse2 libharfbuzz0 libfribidi0 libthai0
+  ```
+</Info>
+
+## CLI
+
+The DevPod CLI lets you manage workspaces entirely from the terminal. Choose an installation method for your platform.
+
+<Tabs>
+  <Tab title="macOS (Apple Silicon)">
+    ```bash
+    curl -L -o devpod "https://github.com/loft-sh/devpod/releases/latest/download/devpod-darwin-arm64" \
+      && sudo install -c -m 0755 devpod /usr/local/bin \
+      && rm -f devpod
+    ```
+  </Tab>
+  <Tab title="macOS (Intel)">
+    ```bash
+    curl -L -o devpod "https://github.com/loft-sh/devpod/releases/latest/download/devpod-darwin-amd64" \
+      && sudo install -c -m 0755 devpod /usr/local/bin \
+      && rm -f devpod
+    ```
+  </Tab>
+  <Tab title="Windows (PowerShell)">
+    ```powershell
+    md -Force "$Env:APPDATA\devpod"
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]'Tls,Tls11,Tls12'
+    Invoke-WebRequest -URI "https://github.com/loft-sh/devpod/releases/latest/download/devpod-windows-amd64.exe" `
+      -OutFile $Env:APPDATA\devpod\devpod.exe
+    $env:Path += ";" + $Env:APPDATA + "\devpod"
+    [Environment]::SetEnvironmentVariable("Path", $env:Path, [System.EnvironmentVariableTarget]::User)
+    ```
+  </Tab>
+  <Tab title="Linux (AMD64)">
+    ```bash
+    curl -L -o devpod "https://github.com/loft-sh/devpod/releases/latest/download/devpod-linux-amd64" \
+      && sudo install -c -m 0755 devpod /usr/local/bin \
+      && rm -f devpod
+    ```
+  </Tab>
+  <Tab title="Linux (ARM64)">
+    ```bash
+    curl -L -o devpod "https://github.com/loft-sh/devpod/releases/latest/download/devpod-linux-arm64" \
+      && sudo install -c -m 0755 devpod /usr/local/bin \
+      && rm -f devpod
+    ```
+  </Tab>
+</Tabs>
+
+Verify the installation:
+
+```bash
+devpod version
+```
+
+### Shell completion
+
+DevPod can generate shell completion scripts for bash, zsh, fish, and PowerShell:
+
+```bash
+# bash
+devpod completion bash > /etc/bash_completion.d/devpod
+
+# zsh
+devpod completion zsh > "${fpath[1]}/_devpod"
+
+# fish
+devpod completion fish > ~/.config/fish/completions/devpod.fish
+```
+
+### Upgrading
+
+To upgrade the CLI to the latest release:
+
+```bash
+devpod upgrade
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/getting-started/quickstart">
+    Create your first workspace and open it in VS Code in under two minutes.
+  </Card>
+  <Card title="Add a provider" icon="plug" href="/providers/add-provider">
+    Connect DevPod to Docker, Kubernetes, or a cloud VM.
+  </Card>
+</CardGroup>
